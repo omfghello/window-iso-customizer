@@ -288,16 +288,6 @@ Because not everyone wants the same level of chaos. Some people want mild chaos.
 
 ---
 
-## Build From Source
-
-```bash
-git clone https://github.com/<your-repo>/wiso.git
-cd wiso
-npm install        # downloads 400MB of node_modules. we are bloatware fighting bloatware.
-npm run build      # builds everything + creates installer
-npm run dev        # dev mode with hot reload (the developer's happy place)
-```
-
 Yes, we used Electron. Yes, we know. The tool that removes bloat ships in a 200MB Electron wrapper. The tool that fights JavaScript bloat is written in JavaScript. The tool that removes unnecessary apps bundles Chromium — the engine that runs Chrome, which Edge is also based on, which we also remove. We are a paradox. We are an ouroboros. We are a snake eating its own tail while complaining about the taste.
 
 If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you. We tried. At 4 AM. After 11 coffees. The raccoons staged an intervention.
