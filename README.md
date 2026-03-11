@@ -51,7 +51,7 @@ Us: "Anyway, here's Firefox."
 | **`WISO-Setup-x.x.x.exe`** | Installer (auto-installs dependencies) | Professional |
 | **`win-unpacked/WISO.exe`** | Portable — no install needed | Trust issues |
 
-Grab them from [Releases](../../releases). Read the [Release Notes](RELEASE_NOTES.md) if you want conspiracy theories about Candy Crush. (You do.)
+Grab them from [Releases](../../releases).
 
 > Requires **Administrator** rights. Yes, you need admin to modify an OS you already own. It's like needing a permission slip to rearrange furniture in your own house. Thanks, Microsoft. Very freedom. Much choice.
 
