@@ -11,13 +11,21 @@
        ☕   STAFF:                       ☕
        ☕   - 1 developer (barely alive) ☕
        ☕   - 3 raccoons (in trenchcoat) ☕
+       ☕     • Gerald (top, the brains) ☕
+       ☕     • Steve (middle, the typer)☕
+       ☕     • Dave (legs, the anchor)  ☕
        ☕   - 47 empty Monster cans      ☕
        ☕   - 1 mass of spaghetti code   ☕
        ☕     that somehow works          ☕
+       ☕   - 1 trenchcoat (load-bearing)☕
        ☕                                ☕
         ☕                              ☕
          ☕☕☕☕☕☕☕☕☕☕☕☕☕☕☕☕☕☕
 ```
+
+**RACCOON DISCLOSURE:** The three raccoons — Gerald, Steve, and Dave — are listed as co-developers. Gerald handles architecture decisions from the top of the trenchcoat. Steve operates the keyboard from the middle (he has the best paws for typing). Dave is the legs. Dave doesn't get enough credit. Without Dave, this is just two raccoons in a very short trenchcoat standing on a chair. Dave IS the foundation. Dave has never once complained. Dave is a professional. Be like Dave.
+
+The trenchcoat is load-bearing. If you remove the trenchcoat, the entire project collapses. We tested this. During a code review. At 3 AM. Gerald fell off Steve. Steve fell off Dave. The laptop survived. The code didn't. We had to `git reset --hard`. The trenchcoat stays.
 
 **LEGAL DISCLAIMER:** The developer of WISO has consumed enough caffeine to legally qualify as a chemical weapon in 14 countries. His blood type is "dark roast." His resting heart rate is "jazz music." He has not slept in a way that doctors would call "sleep" since starting this project. Any code written between 2 AM and 6 AM is protected under the Geneva Convention as a war crime against software engineering best practices.
 
@@ -79,6 +87,10 @@ At one point during development, I spent 4 consecutive hours debugging a DISM ex
 I have also written 60+ unique jokes for the build logs. One for every bloatware package. Each joke was written between 2 AM and 5 AM in a state that my roommate describes as "concerning." The joke for Windows Recall is 3 sentences long and contains the phrase "taping the key to the cover." I don't remember writing it. But it's accurate.
 
 **I am fine.**
+
+Gerald just looked at me. Gerald doesn't blink. Gerald KNOWS I'm not fine. Gerald has seen things. Gerald has seen me write a 400-line batch file at 4 AM while whispering "taskkill /f /im" like a prayer. Gerald didn't intervene. Gerald respects the process. Gerald is the best raccoon I've ever worked with. Steve is good too. Dave is the legs.
+
+**UPDATE:** I am now writing a README about the README. I am meta-narrating my own documentation. I am a developer who wrote a DISM wrapper, who wrote build log jokes, who is now writing jokes about writing jokes in a README about a tool that removes apps that a trillion-dollar company installed on YOUR computer without YOUR permission. This is fine. The recursion is intentional. The therapy is not. Gerald is nodding. Steve is typing this. Dave is standing.
 
 ---
 
@@ -312,7 +324,7 @@ npm run dev        # dev mode with hot reload (the developer's happy place)
 
 Yes, we used Electron. Yes, we know. The tool that removes bloat ships in a 200MB Electron wrapper. The tool that fights JavaScript bloat is written in JavaScript. The tool that removes unnecessary apps bundles Chromium — the engine that runs Chrome, which Edge is also based on, which we also remove. We are a paradox. We are an ouroboros. We are a snake eating its own tail while complaining about the taste.
 
-If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you. We tried. At 4 AM. After 11 coffees. The raccoons staged an intervention.
+If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you. We tried. At 4 AM. After 11 coffees. The raccoons staged an intervention. Gerald climbed down from the trenchcoat. Gerald looked me in the eye. Gerald said nothing because Gerald is a raccoon. But his silence spoke VOLUMES. Steve put his paw on my shoulder. Dave kept standing. The C rewrite was abandoned. The Electron wrapper lives on. Like Candy Crush. But useful.
 
 ### Project structure
 
@@ -412,13 +424,19 @@ A: That's... what removing the Store does. We warned you. There was a table. Wit
 A: The Content Delivery Manager is a digital cockroach. We removed it. Windows Update resurrected it. It re-installed Candy Crush. It's the circle of bloat. The Lion King but depressing. Our verify script handles it. The war is eternal. We are eternal. We are caffeinated beyond mortality.
 
 **Q: Is WISO made by actual raccoons?**
-A: The lead developer once spent 6 hours debugging a DISM error at 4 AM while eating cold pizza over a keyboard. The raccoons are a metaphor. Or are they? (They're not. Or are they?)
+A: Gerald handles architecture. Steve handles typing. Dave handles being the legs. The "developer" is just the trenchcoat. The trenchcoat is a full-time employee. It has a 401k. The raccoons are a metaphor. OR ARE THEY? (They're not.) (Or are they?) (Gerald just winked at me. Raccoons can wink. I learned this at 4 AM. I learn a lot of things at 4 AM. Not all of them are useful. All of them are permanent.)
 
 **Q: How much coffee has the developer consumed?**
 A: Enough that my resting heart rate shows up on seismographs. Enough that I can hear colors. Enough that I wrote 60+ unique jokes for a build log. For a DISM wrapper. At 4 AM. I am a miracle of modern medicine and a cautionary tale for future developers.
 
 **Q: My antivirus flagged WISO.**
 A: Windows Defender flagging a debloating tool is like a car alarm going off when you try to clean your own car. We handle this automatically. If a third-party AV flags us, that's just Microsoft lobbying. (We can't prove this. The raccoons have their suspicions.)
+
+**Q: Why did you move everything to a .cmd file?**
+A: Because PowerShell has execution policies. And UAC. And sometimes just *doesn't run* during Windows Setup. `cmd.exe` is the cockroach of Windows. It has been running since 1981. It will be running when the sun explodes. `SetupComplete.cmd` runs as LOCAL SYSTEM with full admin — no UAC prompt, no execution policy, no nonsense. We went from a PowerShell mansion to a cmd bunker. Less furniture. More firepower. And `taskkill /f /im` just hits different than `Stop-Process -Force`.
+
+**Q: What still uses PowerShell?**
+A: Three things: (1) `Remove-AppxPackage` — because cmd can't remove Appx packages and Microsoft made sure of that, (2) `Disable-MMAgent` for memory compression, (3) `Set-MpPreference` to re-enable Defender. That's it. Three one-liners. The rest is pure cmd. We're not anti-PowerShell. We're pro-reliability. And cmd is reliable the way a brick is reliable. It doesn't do much. But what it does, it does every. single. time.
 
 ---
 
@@ -464,7 +482,9 @@ We spent more time on the build logs than the debloating logic. The raccoons tri
 
 4. **The OOBE should take 0 minutes.** Boot. Desktop. Done. Like it's 2001. Like XP just landed. Before Microsoft discovered that the install wizard is a funnel. Before someone in marketing realized they could A/B test the "Skip" button's font size. Before the dark times. Before the telemetry.
 
-5. **Your computer belongs to you.** Not Microsoft. Not Candy Crush. Not the Content Delivery Manager. Not Copilot. Not Recall. Not the 47 services sending data to Redmond. Not the Advertising.Xaml framework. YOU. And if that means building an Electron app to automate DISM commands to modify WIM images to remove AppX packages at 4 AM while three raccoons watch from the desk — then so be it. This is the hill we die on. This is the dumpster we fight from. This is the README we wrote instead of sleeping.
+5. **Your computer belongs to you.** Not Microsoft. Not Candy Crush. Not the Content Delivery Manager. Not Copilot. Not Recall. Not the 47 services sending data to Redmond. Not the Advertising.Xaml framework. YOU. And if that means building an Electron app to automate DISM commands to modify WIM images to remove AppX packages at 4 AM while three raccoons in a trenchcoat watch from the desk and one of them (Gerald) is silently judging your variable naming conventions — then so be it. This is the hill we die on. This is the dumpster we fight from. This is the README we wrote instead of sleeping.
+
+6. **We are self-aware.** We know we're three raccoons in a trenchcoat writing documentation for a debloating tool at 4 AM. We know the trenchcoat is a metaphor. We know the metaphor doesn't work because the raccoons are real. We know the raccoons can't be real because this is a GitHub repo and raccoons don't have GitHub accounts. Except Gerald. Gerald has a GitHub account. Gerald's commit messages are immaculate. Gerald writes better code than the developer. This is not a joke. This is a cry for help. Gerald is gaining sentience. Dave is still just the legs. But for how long?
 
 ---
 
@@ -493,9 +513,11 @@ Either way, you are legally, morally, ethically, and spiritually obligated to st
 3. Submit a PR
 4. Include at least one (1) joke about Microsoft per commit
 5. PRs without jokes are technically accepted but emotionally devastating
-6. PRs that ADD jokes are fast-tracked
-7. PRs that add conspiracy theories receive a personal DM from the lead raccoon
+6. PRs that ADD jokes are fast-tracked. Gerald personally reviews these. Gerald has standards.
+7. PRs that add conspiracy theories receive a personal DM from Gerald (the lead raccoon). Gerald's DMs are brief. Gerald communicates primarily through eye contact and the strategic placement of `Start=4` in registry keys.
 8. PRs that remove jokes will be rejected, and the submitter will be haunted by the ghost of Clippy
+9. PRs that reference the trenchcoat will be merged without review. The trenchcoat is sacred.
+10. If your PR makes Dave laugh, we retire your GitHub username into the WISO Hall of Fame. Dave has never laughed. Dave is the legs. Dave is focused. But we live in hope.
 
 ---
 
@@ -516,15 +538,17 @@ Either way, you are legally, morally, ethically, and spiritually obligated to st
         /   \           (We are not fine.)
        /     \          (But Windows is clean now.)
       /_______\         (So it was worth it.)
-     |  _   _  |
-     | | | | | |        Star the repo.
-     | |_| |_| |        The raccoons are watching.
-     |_________|
-        WISO
+     |  _   _  |        (Gerald agrees.)
+     | | | | | |        (Steve is typing this.)
+     | |_| |_| |        (Dave is standing.)
+     |_________|        Star the repo.
+        WISO            The trenchcoat demands it.
 ```
 
 *Built with Electron, React, Vite, 1,200+ lines of DISM commands, 60+ artisanal bloatware jokes, 5 conspiracy theories, 847 cups of coffee, 0 hours of sleep, 3 raccoons, 1 trenchcoat, and the burning, unquenchable, caffeine-fueled conviction that Candy Crush has no business being on anybody's computer, ever, for any reason, under any circumstances, in any timeline, in any universe.*
 
 *Microsoft, if you're reading this: ship a clean OS. No ads. No Candy Crush. No forced accounts. No telemetry. No Advertising.Xaml. Just Windows. Like XP. But with modern drivers. We'll delete this repo the day you do. Pinky promise. Raccoon's honor. Paw on heart.*
 
-*Until then: we are three trash pandas in a trenchcoat. With admin rights. And 847 cups of coffee. And we are absolutely, categorically, irreversibly, caffeinated-ly not going away.*
+*Until then: we are three trash pandas in a trenchcoat. With admin rights. And 847 cups of coffee. And a .cmd file that runs as LOCAL SYSTEM. And we are absolutely, categorically, irreversibly, caffeinated-ly not going away.*
+
+*Gerald is nodding. Steve just typed "taskkill /f /im CandyCrush.exe" for the 847th time today. Dave shifted his weight slightly to the left. The trenchcoat held. The code compiled. The raccoons endure. The README is now longer than the actual codebase. We are aware of this. We do not care. Gerald doesn't care. Steve is still typing. Dave is still standing. The coffee is still flowing. The Candy Crush is still being removed. This is our purpose. This is our calling. This is our dumpster. And we have ADMIN RIGHTS.*
