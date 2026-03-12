@@ -51,7 +51,7 @@ Us: "Anyway, here's Firefox."
 | **`WISO-Setup-x.x.x.exe`** | Installer (auto-installs dependencies) | Professional |
 | **`win-unpacked/WISO.exe`** | Portable — no install needed | Trust issues |
 
-Grab them from [Releases](../../releases). Read the [Release Notes](RELEASE_NOTES.md) if you want conspiracy theories about Candy Crush. (You do.)
+Grab them from [Releases](https://github.com/omfghello/window-iso-customizer/releases). Read the [Release Notes](RELEASE_NOTES.md) if you want conspiracy theories about Candy Crush. (You do.)
 
 > Requires **Administrator** rights. Yes, you need admin to modify an OS you already own. It's like needing a permission slip to rearrange furniture in your own house. Thanks, Microsoft. Very freedom. Much choice.
 
@@ -107,8 +107,9 @@ C:\Users\<you>\AppData\Local\Temp\WinIsoMod\
 │               │   ├── Mozilla.Firefox.exe  Past Candy Crush. Past God.
 │               │   └── ...
 │               ├── installer-manifest.json  <-- The treasure map. X marks the .exe
-│               ├── RunLocalInstallers.ps1   <-- The treasure hunter
-│               ├── FirstLogonScript.ps1     <-- The bouncer. The hitman. The janitor. All in one .ps1
+│               ├── SetupComplete.cmd        <-- THE RECKONING. One cmd to rule them all.
+│               ├── FirstLogonScript.ps1     <-- Safety net. If the cmd fails, this picks up the pieces.
+│               ├── firstlogon-options.cmd   <-- set WISO_REMOVE_BLOAT=1. Poetry.
 │               └── ...
 └── sources\
     └── install.wim             <-- 5GB of modified Windows. Our magnum opus. Our crime scene.
@@ -123,23 +124,34 @@ C:\Windows\Setup\Scripts\
 │   ├── Mozilla.Firefox.exe
 │   └── ...
 ├── installer-manifest.json        <-- "Dear Windows, install these. Regards, Management."
-├── RunLocalInstallers.ps1         <-- Runs at first logon. Like a bomb. But with browsers.
-├── FirstLogonScript.ps1           <-- Disables 30+ services. Microsoft hates this one weird trick.
-│                                      (Doctors hate him. Raccoons love him. He is the developer.)
+├── SetupComplete.cmd              <-- THE RECKONING. The cmd that does EVERYTHING. Process murder.
+│                                      Service annihilation. App installation. Desktop copy. Defender
+│                                      re-enable. All in one .cmd. Running as LOCAL SYSTEM. Full admin.
+│                                      No UAC. No execution policy. No mercy. We moved from a PowerShell
+│                                      mansion to a cmd bunker. Fewer features. More explosions.
+├── FirstLogonScript.ps1           <-- Safety net. Fallback stub. If SetupComplete.cmd gets interrupted
+│                                      mid-massacre, this wakes up and re-runs it. Like a dead man's
+│                                      switch. But for debloating. (It used to do everything. Now it
+│                                      sits in a rocking chair telling war stories.)
+├── firstlogon-options.cmd         <-- Your build settings in cmd format. set "WISO_REMOVE_BLOAT=1".
+│                                      set "WISO_GAMING_MODE=0". Pure batch poetry. cmd can't parse
+│                                      JSON (it tried, it cried), so we write environment variables.
+├── firstlogon-options.json        <-- Same settings in JSON. For legacy. For the PowerShell grandpa.
 ├── VerifyAndCleanupBloat.ps1      <-- The eternal guardian. Because Windows WILL try to reinstall
 │                                      Candy Crush. It always does. It's like a horror movie villain.
 │                                      You think it's dead. Credits roll. Then: *match-3 sounds*
-├── firstlogon-options.json        <-- Your build settings, preserved in amber
 └── packages-to-remove.txt        <-- The hit list. 150+ names. No survivors.
 ```
 
-**What happens at first logon:**
+**What happens after OOBE (The Reckoning):**
 
-1. `FirstLogonScript.ps1` runs hidden — disables 30+ telemetry services, applies 50+ registry tweaks, removes bloatware. Microsoft: "We're collecting diagnostics." Script: *[unplugs ethernet]* *[sets firewall to REJECT ALL]* *[disables 47 scheduled tasks]* *[puts on sunglasses]*
-2. Registers `RunLocalInstallers.ps1` via `RunOnce` so your apps install after the desktop appears
-3. Each installer launches normally so you can click through setup. We're not monsters. We're raccoons. There's a difference. (The difference is we have thumbs. Opposable ones. That we use to press "Remove" on Candy Crush.)
-4. After all installers finish, the `installers\` folder self-destructs. Like Mission Impossible. But with Firefox.
-5. `VerifyAndCleanupBloat.ps1` runs as a scheduled task. It's the night guard. It's the cleanup crew. It's the dude who stays after the party to make sure Candy Crush doesn't sneak back in through the window. Because it will try. IT ALWAYS TRIES.
+1. `SetupComplete.cmd` fires automatically as **LOCAL SYSTEM**. Full admin. No UAC prompt. No execution policy. No asking nicely. Windows built this hook for OEMs like Dell and HP. We are now Dell. Three raccoons in a Dell costume. The cmd kills 80+ processes (`taskkill /f /im` — `taskkill` just hits different), disables 50+ services (`sc config start= disabled`), removes Appx bloatware via PowerShell one-liners (the only thing cmd can't do natively), uninstalls OneDrive from 6 different angles, and sets your power plan to "MAXIMUM OVERDRIVE." All in batch. Pure cmd. We went from a PowerShell cathedral to a cmd bunker. Fewer features. More explosions. Maximum reliability.
+2. Your baked-in apps get copied to `Desktop\WISO-Installers\` via `robocopy` (the real user's Desktop, not SYSTEM's — we resolve the actual human from the registry like digital detectives). Then it runs them: MSI gets `msiexec /quiet`, EXE gets 7 different silent flag combos (`/VERYSILENT`, `/S`, `/silent`, `/quiet`, `-s`, `--silent`, `/qn` — we try them all like picking a lock with 7 picks), MSIX/APPX gets a PowerShell `Add-AppxPackage` one-liner. If all 7 flags fail, interactive fallback. YOUR APPS WILL INSTALL OR WE WILL DIE TRYING.
+3. `FirstLogonScript.ps1` is now a fallback stub. It used to run the whole show — 300+ lines of fury. Now it checks if `SetupComplete.cmd` finished (via a done-flag), and if not, re-runs it. Like a dead man's switch for debloating. It's retired. It sits in a rocking chair. Telling war stories about the time it disabled 47 services in one pass.
+4. Defender gets RE-ENABLED at the end. We delete the offline policy keys, run `Set-MpPreference -DisableRealtimeMonitoring $false`, and let Defender wake up to a clean system. "I did a great job," Defender says. We let it have this.
+5. `VerifyAndCleanupBloat.ps1` runs as scheduled tasks at 2, 5, 15, 30, 60 minutes. It's the night guard. The cleanup crew. The dude who stays after the party to make sure Candy Crush doesn't sneak back in through the window. Because it will try. IT ALWAYS TRIES.
+
+**Three layers of reliability:** `SetupComplete.cmd` (LOCAL SYSTEM, guaranteed by Windows) → `FirstLogonCommands` in unattend.xml (backup trigger) → `RunOnce` registry key (tertiary fallback). A done-flag prevents double execution. Belt, suspenders, AND duct tape.
 
 ---
 
@@ -291,8 +303,8 @@ Because not everyone wants the same level of chaos. Some people want mild chaos.
 ## Build From Source
 
 ```bash
-git clone https://github.com/<your-repo>/wiso.git
-cd wiso
+git clone https://github.com/omfghello/window-iso-customizer.git
+cd window-iso-customizer
 npm install        # downloads 400MB of node_modules. we are bloatware fighting bloatware.
 npm run build      # builds everything + creates installer
 npm run dev        # dev mode with hot reload (the developer's happy place)
@@ -316,8 +328,9 @@ If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you
 │   ├── tools.ts            # PowerShell/DISM/oscdimg wrappers. The toolbox.
 │   └── preload.ts          # Context bridge. The bouncer between renderer and main.
 ├── assets/                 # The payload. The goods. The contraband.
-│   ├── FirstLogonScript.ps1     # 300+ lines of service disabling, registry tweaking, bloatware removing FURY
-│   ├── RunLocalInstallers.ps1   # Installs your smuggled apps. Like a customs agent but in reverse.
+│   ├── SetupComplete.cmd        # THE RECKONING. 400+ lines of pure cmd fury. Runs as LOCAL SYSTEM.
+│   ├── FirstLogonScript.ps1     # Retired veteran. Now a fallback stub. Tells war stories.
+│   ├── RunLocalInstallers.ps1   # Legacy. SetupComplete.cmd handles this now. Kept for sentimental value.
 │   ├── VerifyAndCleanupBloat.ps1 # The eternal guardian. The night's watch. Candy Crush shall not pass.
 │   ├── packages-to-remove.txt   # 150+ package names. I counted them. Twice. At 5 AM. The raccoons helped.
 │   └── apps-list.json           # 50+ apps you can bake in. The GOOD apps. The ones you CHOSE.
@@ -334,7 +347,7 @@ If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you
 2. **Convert** — If the image is ESD, converts to WIM. Microsoft invented both formats. In the same decade. For the same purpose. Because consistency is apparently optional when you're worth $3 trillion.
 3. **Mount** — DISM mounts `install.wim`. We're performing open-heart surgery on Windows. With Microsoft's own scalpel. While the patient is unconscious. It's ethical because the patient is Candy Crush and it had it coming.
 4. **TPM bypass** — Empties `appraiserres.dll` + writes LabConfig registry keys directly into the offline SYSTEM hive. The billion-dollar security check, bypassed by one empty DLL and three registry keys. The lock that Microsoft said couldn't be picked? It's a screen door. With a "push" sign.
-5. **Inject** — Copies `unattend.xml` into `Windows\Panther\` inside the WIM. Scripts + installers into `Windows\Setup\Scripts\`. We're using the folder Microsoft designed for OEM customization. We are technically the OEM now. Dell, HP, Lenovo, and... us. Three raccoons in a trenchcoat. With admin rights.
+5. **Inject** — Copies `unattend.xml` into `Windows\Panther\` inside the WIM. Injects `SetupComplete.cmd` (the main weapon), `FirstLogonScript.ps1` (the safety net), `firstlogon-options.cmd` (build settings in `set VAR=1` format because cmd can't parse JSON and we're not pretending it can), plus your app installers into `Windows\Setup\Scripts\`. We're using the folder Microsoft designed for OEM customization. We are technically the OEM now. Dell, HP, Lenovo, and... us. Three raccoons in a trenchcoat. With admin rights. And a .cmd file.
 6. **Debloat** — Removes provisioned AppX packages offline via DISM. Deletes Edge and OneDrive folders. Physically. From the image. They're gone. Like they were never there. Because they shouldn't have been.
 7. **Optimize** — Re-exports WIM with LZX compression. We tried LZMS (ESD). It corrupted the image. Microsoft's own compression algorithm can't handle Microsoft's own modified images. I spent 6 hours debugging this. At 4 AM. The raccoons fell asleep. I didn't. I can't. The coffee won't let me.
 8. **Commit** — DISM unmounts and commits changes. Like saving a game. Except the game is "making Windows usable" and the final boss is Content Delivery Manager.
@@ -352,10 +365,11 @@ Windows Defender will try to stop us from removing Windows bloatware. I'll say i
 
 This is like if your home security system prevented you from throwing away junk mail. "THREAT DETECTED: User is attempting to remove pre-installed Candy Crush shortcut. BLOCKING." Thank you, Defender. Very helpful. Very cool.
 
-WISO handles this:
+WISO handles this with a three-stage approach that would make the CIA jealous:
 
-- **During build**: Tries Defender exclusions. If tamper protection says no, we temporarily disable real-time scanning. Then re-enable it. We're chaotic good, not chaotic evil.
-- **At first logon**: Same dance. Exclusion → disable → do the thing → re-enable.
+- **During build (your PC)**: Tries Defender exclusions. If tamper protection says no, we temporarily disable real-time scanning. Then re-enable it. We're chaotic good, not chaotic evil.
+- **Offline bake (in the WIM)**: We inject Defender *disable policy keys* directly into the SOFTWARE registry hive during the build. `DisableAntiSpyware=1`. `DisableRealtimeMonitoring=1`. Seven policy keys total. When the target machine boots, Defender services start (OOBE needs them to not panic), but real-time scanning is DOA from the first millisecond. It's like hiring a security guard and telling them to close their eyes. They're there. They're just... not watching.
+- **First boot (SetupComplete.cmd)**: The cmd does its thing — process massacre, service annihilation, app installation — with zero Defender interference. At the very end, it deletes the policy keys (`reg delete`), runs `Set-MpPreference -DisableRealtimeMonitoring $false`, and lets Defender wake up to a sparkling clean system. Defender opens its eyes. Everything is tidy. "I did a great job protecting this system," it says, nodding approvingly. We let it have this moment.
 
 Defender goes right back to protecting you from actual threats. And from removing Candy Crush. But mostly actual threats. We hope.
 
@@ -373,6 +387,8 @@ Testing in a VM? Smart. We broke Windows 4 times during development. And that wa
 ---
 
 ## FAQ (Frequently Anticipated Questions)
+
+> **Full FAQ with 40+ questions (and joke answers in Deadpool style):** [FAQ.md](FAQ.md)
 
 **Q: Is this legal?**
 A: We use Microsoft's own tools (DISM, oscdimg, PowerShell) to modify Microsoft's own OS. It's their tools. Their OS. Their answer file format. Their deployment pipeline. We just... used it. For its intended purpose. But not in the way they intended. Is it legal? Yes. Is it petty? Also yes. We contain multitudes.
