@@ -51,7 +51,7 @@ Us: "Anyway, here's Firefox."
 | **`WISO-Setup-x.x.x.exe`** | Installer (auto-installs dependencies) | Professional |
 | **`win-unpacked/WISO.exe`** | Portable — no install needed | Trust issues |
 
-Grab them from [Releases](../../releases).
+Grab them from [Releases](../../releases). Read the [Release Notes](RELEASE_NOTES.md) if you want conspiracy theories about Candy Crush. (You do.)
 
 > Requires **Administrator** rights. Yes, you need admin to modify an OS you already own. It's like needing a permission slip to rearrange furniture in your own house. Thanks, Microsoft. Very freedom. Much choice.
 
@@ -288,6 +288,16 @@ Because not everyone wants the same level of chaos. Some people want mild chaos.
 
 ---
 
+## Build From Source
+
+```bash
+git clone https://github.com/<your-repo>/wiso.git
+cd wiso
+npm install        # downloads 400MB of node_modules. we are bloatware fighting bloatware.
+npm run build      # builds everything + creates installer
+npm run dev        # dev mode with hot reload (the developer's happy place)
+```
+
 Yes, we used Electron. Yes, we know. The tool that removes bloat ships in a 200MB Electron wrapper. The tool that fights JavaScript bloat is written in JavaScript. The tool that removes unnecessary apps bundles Chromium — the engine that runs Chrome, which Edge is also based on, which we also remove. We are a paradox. We are an ouroboros. We are a snake eating its own tail while complaining about the taste.
 
 If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you. We tried. At 4 AM. After 11 coffees. The raccoons staged an intervention.
@@ -331,6 +341,8 @@ If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you
 9. **Repack** — oscdimg creates a bootable ISO. You now have a Windows ISO that respects your time, your disk space, your privacy, and your fundamental human right to not have Candy Crush pre-installed on your computer.
 
 The `unattend.xml` is placed **inside the WIM** (not on the ISO root) because Microsoft's installer re-reads the answer file on every boot from USB and starts a fresh install. Every. Time. We discovered this at 3 AM. We fixed it at 5 AM. We cried at 5:01 AM. We're fine now. (We're not fine.)
+
+> **Want the full technical deep dive?** See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) — every step, every registry key, every phase, in excruciating detail. No hand-waving. No "it just works." Just the machinery.
 
 ---
 
