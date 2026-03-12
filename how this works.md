@@ -1,6 +1,8 @@
 # How WISO Works — The Complete Technical Deep Dive
 
-This document explains *exactly* what WISO does, in what order, and why. Every step, every file, every registry key. No hand-waving. No "it just works." If you want to understand the machinery, read on.
+*This document explains exactly what WISO does, in what order, and why. Every step, every file, every registry key, every `taskkill /f /im`. No hand-waving. No "it just works." If you want to understand the machinery — the gears, the blood, the batch files — read on. Written at 4 AM. Fueled by coffee. Narrated by a man who moved 400 lines of PowerShell into a .cmd file and felt nothing but pride.*
+
+*[Gerald's note: This document is the most accurate description of our work. The developer wrote it while I supervised from the top of the trenchcoat. Steve typed the code examples. Dave provided structural support. I have reviewed every technical claim in this document. They are correct. The jokes are adequate. I would have written better jokes but I am a raccoon and my comedic sensibilities lean more toward "knocking over trash cans at 3 AM" which doesn't translate well to markdown.]*
 
 ---
 
@@ -41,16 +43,19 @@ WISO operates in three distinct phases:
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  PHASE C: FIRST LOGON (target machine, our scripts)                          │
-│  • FirstLogonCommands triggers RunFirstLogon.cmd                            │
-│  • RunFirstLogon.cmd invokes FirstLogonScript.ps1                            │
-│  • Process massacre, service nuke, OneDrive kill, Appx purge, app install   │
-│  • Schedule verification sweeps                                             │
+│  PHASE C: FIRST BOOT (target machine, SetupComplete.cmd — THE RECKONING)    │
+│  • Windows auto-runs SetupComplete.cmd as LOCAL SYSTEM (full admin, no UAC)│
+│  • Process massacre, service nuke, OneDrive kill, Appx purge (PS 1-liner) │
+│  • App copy to Desktop via robocopy, silent install (7 flag combos)        │
+│  • Defender re-enable, verification sweeps scheduled                        │
+│  • FirstLogonScript.ps1 = fallback stub (dead man's switch)                │
 │  Output: Clean, debloated Windows                                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Critical insight:** Most of the "heavy lifting" happens in Phase A (offline, in the WIM). Phase C only handles what *cannot* be done offline: killing running processes, uninstalling OneDrive via its setup executable, running `.exe`/`.msi` installers (which need a live OS), and configuring power plans. Everything else — registry, services, scheduled tasks, Appx deprovisioning — is baked into the image during the build.
+**Critical insight:** Most of the "heavy lifting" happens in Phase A (offline, in the WIM). Phase C only handles what *cannot* be done offline: killing running processes, uninstalling OneDrive via its setup executable, running `.exe`/`.msi` installers (which need a live OS), and configuring power plans. Everything else — registry, services, scheduled tasks, Appx deprovisioning, Defender policy keys — is baked into the image during the build.
+
+**The cmd revolution:** Phase C used to be a PowerShell empire. `FirstLogonScript.ps1` did everything. 300+ lines. It was a cathedral of `try/catch` blocks. A mansion of `-ErrorAction SilentlyContinue`. And then, at 3 AM, during the 47th test build, PowerShell said "execution policy restriction." Gerald looked at the developer. The developer looked at Gerald. Gerald climbed down from the trenchcoat. Gerald walked to the keyboard. Gerald typed `cmd`. Gerald climbed back up. And that was the moment we moved EVERYTHING into `SetupComplete.cmd` — a batch file that Windows runs as LOCAL SYSTEM with full admin rights, guaranteed, no questions asked. cmd.exe has been running since 1981. It predates Gerald. It predates Steve. It DEFINITELY predates Dave. It will be running when the sun explodes. We respect that. PowerShell is now used for exactly 3 things cmd can't do natively: Appx removal, `Disable-MMAgent`, and `Set-MpPreference`. Three one-liners. The rest is pure, beautiful, violent batch. Gerald approves. Steve typed it. Dave is still standing.
 
 ---
 
@@ -126,18 +131,17 @@ Instead, we place the answer file at `Mount\Windows\Panther\unattend.xml` — *i
 - `ComputerName` (if user set one)
 - `DesktopOptimization` (Store apps off taskbar)
 - If `skipOobe`: `OOBE` (hide all setup screens), `UserAccounts` (local account with name/password), `AutoLogon` (log on once automatically)
-- `FirstLogonCommands`: `cmd /min /c "%SystemRoot%\Setup\Scripts\RunFirstLogon.cmd"` (and optionally a BitLocker reg command)
+- `FirstLogonCommands`: PowerShell invocation of `FirstLogonScript.ps1` (BACKUP trigger — the real work is done by `SetupComplete.cmd` which Windows runs automatically, but this is belt-and-suspenders)
 - `International` (input locale, UI language, etc.)
 
 **Script injection:** We create `Mount\Windows\Setup\Scripts\` and copy:
 
-- `RunFirstLogon.cmd` — Batch launcher
-- `FirstLogonScript.ps1` — Main first-logon logic
-- `RunLocalInstallers.ps1` — Runs baked-in app installers
-- `VerifyAndCleanupBloat.ps1` — Used by scheduled tasks
+- `SetupComplete.cmd` — **THE MAIN WEAPON.** Windows auto-runs `%WINDIR%\Setup\Scripts\SetupComplete.cmd` as LOCAL SYSTEM after OOBE. This is the PRIMARY execution point. 400+ lines of batch fury. If this file exists, Windows runs it. No questions. No UAC. No execution policy. Microsoft built this hook for OEMs. We are the OEM now. Three raccoons in a Dell costume.
+- `FirstLogonScript.ps1` — **FALLBACK STUB.** Checks if `SetupComplete.cmd` finished (via done-flag). If not, re-runs it. A dead man's switch for debloating. It used to run the whole show. Now it's retired. Rocking chair. War stories.
+- `VerifyAndCleanupBloat.ps1` — Scheduled verification sweeps
 - `registry-tweaks.reg` — Optional; some setups import this
 
-**firstlogon-options.json:** We write a JSON file with the user's build options: `removeBloatware`, `privacyTweaks`, `gamingMode`, `disableGameBar`, `ultraPerformance`, `highPerformancePower`, `disableWindowsSpotlight`, `hideTaskbarSearch`, `defenderExclusionsOnly`. FirstLogonScript.ps1 reads this at runtime to decide what to do.
+**firstlogon-options.json AND firstlogon-options.cmd:** We write TWO config files. The JSON has the user's build options for legacy/PowerShell compatibility. The `.cmd` is the same data in batch format — `set "WISO_REMOVE_BLOAT=1"`, `set "WISO_GAMING_MODE=0"`, etc. `SetupComplete.cmd` loads this with a simple `call firstlogon-options.cmd`. Because cmd can't parse JSON. It tried. It cried. It gave up. We gave it environment variables instead. Everyone's happy.
 
 **packages-to-remove.txt:** If `removeBloatware` is on, we copy our default list (or the user's custom list) to `Setup\Scripts\packages-to-remove.txt`. The first-logon script and VerifyAndCleanupBloat use this for Appx removal.
 
@@ -203,6 +207,22 @@ This is where we rewrite Windows' brain. All of this happens on the *mounted* fi
 - `OneDrive` — DisableFileSyncNGSC=1, DisableFileSync=1
 - `GameDVR` — AllowGameDVR=0 (if disableGameBar)
 - OneDrive CLSID unpin, Run key deletion, etc.
+
+#### 5b-extra: Offline Defender Neutering (SOFTWARE hive)
+
+If `defenderExclusionsOnly` is NOT set (i.e., the user wants full offline Defender disable), we bake 7 policy keys into the SOFTWARE hive before unloading:
+
+```
+reg add "HKLM\WISO_SW\Policies\Microsoft\Windows Defender" /v DisableAntiSpyware /t REG_DWORD /d 1 /f
+reg add "HKLM\WISO_SW\Policies\Microsoft\Windows Defender\Real-Time Protection" /v DisableRealtimeMonitoring /t REG_DWORD /d 1 /f
+reg add "HKLM\WISO_SW\Policies\Microsoft\Windows Defender\Real-Time Protection" /v DisableBehaviorMonitoring /t REG_DWORD /d 1 /f
+reg add "HKLM\WISO_SW\Policies\Microsoft\Windows Defender\Real-Time Protection" /v DisableIOAVProtection /t REG_DWORD /d 1 /f
+reg add "HKLM\WISO_SW\Policies\Microsoft\Windows Defender\Real-Time Protection" /v DisableOnAccessProtection /t REG_DWORD /d 1 /f
+reg add "HKLM\WISO_SW\Policies\Microsoft\Windows Defender\Real-Time Protection" /v DisableScanOnRealtimeEnable /t REG_DWORD /d 1 /f
+reg add "HKLM\WISO_SW\Policies\Microsoft\Windows Defender\Real-Time Protection" /v DisableScriptScanning /t REG_DWORD /d 1 /f
+```
+
+**Why:** When the target boots, Defender services start (OOBE needs them or it panics), but the policy keys tell Defender "don't scan anything. Close your eyes." Real-time protection is DOA from the first millisecond. This means `SetupComplete.cmd` can kill processes, delete folders, and run installers with zero Defender interference. At the end, the cmd deletes these policy keys and re-enables scanning. Defender wakes up. Everything is clean. It takes credit. We let it.
 
 Then `reg unload HKLM\WISO_SW`.
 
@@ -279,58 +299,125 @@ When the user boots from the WISO-created USB/ISO and installs Windows:
 
 ---
 
-## 4. Phase C: First Logon (The Reckoning)
+## 4. Phase C: First Boot (The Reckoning — Now in cmd)
 
-### 4.1 RunFirstLogon.cmd
+*We used to run this whole show in PowerShell. 300+ lines of `Stop-Process` and `Set-Service` and `try/catch` and `-ErrorAction SilentlyContinue`. It was a cathedral. A beautiful, fragile cathedral. Then we discovered that PowerShell sometimes just doesn't run during Windows Setup because execution policies, UAC, and the universe conspire against us. So we demolished the cathedral. And built a bunker. Out of cmd. And `taskkill`. And `sc config`. And it has never, EVER, failed to execute. cmd.exe: the cockroach of Windows since 1981.*
 
-The batch file:
+### 4.1 SetupComplete.cmd — THE PRIMARY EXECUTOR
 
-1. **Registers a Run key** so that if the script doesn't complete (e.g. reboot mid-run), it will run again at next logon: `HKCU\...\Run` = `cmd /min /c "C:\Windows\Setup\Scripts\RunFirstLogon.cmd"`
+**How it starts:** Windows has a built-in hook: if `%WINDIR%\Setup\Scripts\SetupComplete.cmd` exists, Windows runs it automatically as **LOCAL SYSTEM** after OOBE completes. No UAC prompt. No execution policy. Full administrative privileges. Microsoft built this for OEMs like Dell and HP to do post-install customization. We are now Dell. Three raccoons in a Dell costume. With a .cmd file. And 80 `taskkill` commands.
 
-2. **Waits for FirstLogonScript.ps1 to exist** — first boot can be slow, files might not be fully written. It loops up to 15 times (2 sec each = 30 sec).
+**Guard:** If `wiso-firstlogon-done.flag` exists, the cmd cleans up Run/RunOnce keys and exits. It only runs once.
 
-3. **Invokes PowerShell:**
-   ```
-   C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File "C:\Windows\Setup\Scripts\FirstLogonScript.ps1" >> "C:\Windows\Setup\Scripts\wiso-firstlogon.log" 2>&1
-   ```
+**Options load:** `call "%~dp0firstlogon-options.cmd"` — loads `WISO_REMOVE_BLOAT`, `WISO_PRIVACY_TWEAKS`, `WISO_GAMING_MODE`, `WISO_DISABLE_GAMEBAR`, `WISO_ULTRA_PERF`, `WISO_HIGH_PERF`, `WISO_DEFENDER_EXCL_ONLY`, `WISO_DEFENDER_OFF_OFFLINE`, etc. as environment variables. No JSON parsing. No PowerShell. Just `set` commands. Beautiful.
 
-4. **If script not found after 30s:** Writes to RunOnce `WISO_FirstLogon_Retry` with the same PowerShell command, so it runs at next logon.
+**Defender check:** If `WISO_DEFENDER_OFF_OFFLINE=1`, writes `wiso-defender-disabled.flag`. This tells other scripts "Defender is asleep. Don't wake it."
 
-### 4.2 FirstLogonScript.ps1 — Phases
+**RunOnce fallback registration:** Registers `FirstLogonScript.ps1` in `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce` as a tertiary safety net.
 
-**Guard:** If `wiso-firstlogon-done.flag` exists, the script removes itself from Run/RunOnce and exits. It only runs once.
+**Phase 0 — Process Massacre:**
+```batch
+taskkill /f /im OneDrive.exe >nul 2>&1
+taskkill /f /im msedge.exe >nul 2>&1
+taskkill /f /im Teams.exe >nul 2>&1
+... 77 more ...
+```
+Pure cmd. 80+ processes. `taskkill /f /im` — no `-ErrorAction SilentlyContinue`, no `try/catch`, just `/f` for force and `>nul 2>&1` for silence. If the process doesn't exist, taskkill shrugs. If it does, taskkill kills it. Simple. Brutal. Effective. Xbox/GameBar processes are conditionally skipped based on `WISO_GAMING_MODE` and `WISO_DISABLE_GAMEBAR`.
 
-**Options load:** Reads `firstlogon-options.json` to get `removeBloatware`, `privacyTweaks`, `gamingMode`, etc.
+**Phase 0b — Post-OOBE Service Annihilation:**
+```batch
+sc stop "ClipSVC" >nul 2>&1
+sc config "ClipSVC" start= disabled >nul 2>&1
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\ClipSVC" /v Start /t REG_DWORD /d 4 /f >nul 2>&1
+... repeat for 50+ services ...
+```
+Three commands per service: stop it, configure it disabled, hammer `Start=4` into the registry for good measure. Belt AND suspenders. These services were protected during OOBE (ClipSVC, InstallService, AppReadiness, TokenBroker, etc.). Their diplomatic immunity has expired. Per-user service templates (CDPUserSvc, OneSyncSvc, etc.) get the same treatment. 18 scheduled tasks get `schtasks /change /disable`.
 
-**Defender:** Tries `Add-MpPreference -ExclusionPath` for the script dir. If that fails and `defenderExclusionsOnly` is false, calls `Disable-WisoDefender` (same as builder: disables real-time, IOAV, behavior, script scanning, plus registry policies). Writes a flag file. At the end of the script, we re-enable Defender and delete the flag.
+**Phase 1a — OneDrive Extinction:**
+```batch
+taskkill /f /im OneDrive.exe >nul 2>&1
+"%SystemRoot%\System32\OneDriveSetup.exe" /uninstall >nul 2>&1
+"%SystemRoot%\SysWOW64\OneDriveSetup.exe" /uninstall >nul 2>&1
+winget uninstall --id Microsoft.OneDrive --silent --purge --force >nul 2>&1
+```
+Plus a PowerShell one-liner for `Remove-AppxPackage *OneDrive*` (cmd can't do Appx removal). Plus folder deletion. Plus registry Run key deletion. OneDrive attacked from 6 angles. No survivors.
 
-**Phase 0 — Process Massacre:** If `removeBloatware` or `privacyTweaks`, we iterate over 80+ process names and `Stop-Process -Force` on each. We never touch explorer, dwm, csrss, lsass, svchost, SearchApp, StartMenuExperienceHost, ShellExperienceHost. We conditionally skip Xbox/GameBar processes if `gamingMode` is on or `disableGameBar` is off.
+**Phase 1b — Power Plan:**
+`powercfg` commands in pure cmd: duplicate scheme, set active, disable hibernation, core parking, etc. One PowerShell one-liner for `Disable-MMAgent -mc` (no cmd equivalent).
 
-**Phase 0b — Post-OOBE Service Annihilation:** We disable 50+ services that we had to protect during OOBE: ClipSVC, InstallService, AppReadiness, TokenBroker, NgcCtnrSvc, NgcSvc, UsoSvc, WaaSMedicSvc, etc. We use `Set-Service -StartupType Disabled` and also write `Start=4` directly to the registry. We disable per-user service instances (OneSyncSvc_*, CDPUserSvc_*, etc.). We conditionally skip Xbox services if `gamingMode`, and Game DVR if `disableGameBar` is off. We run `schtasks /change /disable` on 18 telemetry tasks.
+**Phase 1c — Online Appx Removal:**
+A PowerShell one-liner does 3 passes of `Remove-AppxProvisionedPackage` and `Remove-AppxPackage`. This is the ONE thing cmd genuinely cannot do — Microsoft tied Appx management exclusively to PowerShell cmdlets. So we use a single PowerShell command. ONE. The rest is cmd. Edge folders get deleted. Start menu shortcuts get swept. Desktop shortcuts get cleaned.
 
-**Phase 1a — OneDrive:** If `removeBloatware`, we taskkill OneDrive processes, run OneDriveSetup.exe /uninstall from multiple locations, winget uninstall Microsoft.OneDrive, Remove-AppxPackage *OneDrive*, Remove-AppxProvisionedPackage *OneDrive*, delete OneDrive folders, remove Run keys.
+**Phase 2 — Verification Sweep Scheduling:**
+```batch
+for %%M in (2 5 15 30 60) do (
+    schtasks /create /tn "WISO_BloatVerify%%M" /tr "..." /sc once /st ... /f
+)
+```
+Five one-time tasks. VerifyAndCleanupBloat.ps1 at 2, 5, 15, 30, 60 minutes. Because Windows WILL try to reinstall Candy Crush.
 
-**Phase 1b — Power plan:** If `ultraPerformance`, we duplicate the "Ultimate Performance" scheme, set it active, disable core parking, set PROCTHROTTLEMIN=100, Disable-MMAgent -mc. If `highPerformancePower`, we activate the High Performance scheme.
+**Phase 3 — Installer Copy + Execution (ALL IN CMD):**
 
-**Phase 1c — Online Appx removal:** If `removeBloatware`, we run 3 passes of Remove-AppxProvisionedPackage and Remove-AppxPackage for packages matching our list. We also delete Edge folders, start menu shortcuts for bloat, etc.
+*Desktop path resolution:* When running as SYSTEM, `%USERPROFILE%` points to `C:\Windows\system32\config\systemprofile`. Not helpful. So we query `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList` to find the real user's SID, then read their `ProfileImagePath`. Digital detective work. In batch. At 4 AM. The raccoons were impressed.
 
-**Phase 2 — Schedule verification sweeps:** We create 5 scheduled tasks: `WISO_BloatVerify2`, `5`, `15`, `30`, `60` — each runs VerifyAndCleanupBloat.ps1 at that many minutes from now. One-time (`/sc once`).
+```batch
+robocopy "%SCRIPTDIR%installers" "%USERDESKTOP%\WISO-Installers" /E /R:2 /W:1 /NP /NDL /NFL >nul 2>&1
+```
 
-**Phase 3 — App installers:** We copy installers from `Setup\Scripts\installers\` to `Desktop\WISO-Installers\`, Unblock-File on everything, add Defender exclusions, then spawn a child PowerShell process to run `RunLocalInstallers.ps1`. We wait for it. If it fails to launch, we queue it for RunOnce.
+Then for each installer file:
+- **MSI:** `msiexec /i "file" /quiet /norestart /qn` with interactive fallback
+- **MSIX/APPX:** PowerShell one-liner `Add-AppxPackage -Path "file"`
+- **EXE:** A `:install_exe` subroutine tries 7 silent flag combos:
+  1. `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-` (Inno Setup)
+  2. `/S` (NSIS)
+  3. `/silent /norestart` (generic)
+  4. `/quiet /norestart` (generic)
+  5. `-s` (7-Zip style)
+  6. `--silent` (some Linux-ported)
+  7. `/qn /norestart` (MSI-wrapped EXE)
 
-**Phase 4 — Second process massacre:** We kill the same processes again (respawn check).
+  If all 7 fail (exit code != 0), interactive fallback. It's like picking a lock with 7 picks. One usually works. If not, we kick the door down.
 
-**Phase 5 — Cleanup:** Remove Run/RunOnce keys, re-enable Defender if we disabled it, write the done flag.
+Source `installers\` directory gets cleaned up. Desktop copies persist.
 
-### 4.3 RunLocalInstallers.ps1
+**Phase 4 — Second Process Massacre:** Same `taskkill` list. Respawn check. Because bloatware is persistent. Like herpes. But less useful.
 
-Reads `installer-manifest.json`. For each entry:
+**Phase 5 — Defender Re-enable + Cleanup:**
+```batch
+reg delete "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender" /v DisableAntiSpyware /f
+reg delete "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection" /f
+powershell -Command "Set-MpPreference -DisableRealtimeMonitoring $false"
+```
+Delete policy keys. Re-enable scanning via PowerShell one-liner. Delete `wiso-defender-disabled.flag`. Clean up Run/RunOnce keys. Write `wiso-firstlogon-done.flag`. Done.
 
-- **MSI:** `msiexec /i "path" /quiet /norestart /qn` (or interactive fallback)
-- **MSIX/APPX:** `Add-AppxPackage -Path path`
-- **EXE:** Tries 7 silent flag combinations (`/VERYSILENT`, `/S`, `/silent`, etc.), then interactive. Logs every attempt.
+### 4.2 FirstLogonScript.ps1 — THE FALLBACK STUB
 
-After all installs, we re-enable Defender (if we disabled it), delete the installers dir and manifest to free space. The Desktop copies remain so the user can re-run installers manually.
+*This script used to be 300+ lines of fury. It killed processes. It disabled services. It removed Appx packages. It installed apps. It was the whole show. Now it's a stub. A safety net. A dead man's switch. It sits in a rocking chair telling war stories about the time it disabled 47 services in one pass. The raccoons visit sometimes.*
+
+**What it does now:**
+1. Checks if `wiso-firstlogon-done.flag` exists → if yes, cleans up Run/RunOnce keys and exits
+2. If not done → re-launches `SetupComplete.cmd` (which checks its own done-flag)
+3. Registers itself in RunOnce as a further fallback
+
+That's it. 30 lines. Down from 300. The PowerShell mansion is now a PowerShell mailbox.
+
+### 4.3 The Three-Layer Reliability Chain
+
+```
+Layer 1: SetupComplete.cmd  →  LOCAL SYSTEM, guaranteed by Windows
+                                If %WINDIR%\Setup\Scripts\SetupComplete.cmd exists, it runs.
+                                Period. Microsoft's own documentation says so.
+
+Layer 2: FirstLogonCommands  →  unattend.xml backup trigger
+                                Runs FirstLogonScript.ps1 in user context.
+                                If SetupComplete.cmd already finished (done-flag), it exits.
+
+Layer 3: RunOnce registry    →  Tertiary fallback
+                                SetupComplete.cmd registers FirstLogonScript.ps1 in RunOnce.
+                                If both Layer 1 and 2 fail, next logon triggers this.
+```
+
+A single `wiso-firstlogon-done.flag` prevents double execution across all three layers. Belt, suspenders, duct tape, and Dave holding your pants up. Dave has been holding pants up since the beginning. Dave's leg day is EVERY day. Dave doesn't skip leg day because Dave IS leg day. The reliability of this system is directly proportional to Dave's quad strength. Dave's quads are immense. The system has never failed.
 
 ### 4.4 VerifyAndCleanupBloat.ps1
 
@@ -357,13 +444,21 @@ It only runs if `removeBloatware` is true (from firstlogon-options.json).
 - **Services:** Service start type is stored in the registry. By setting Start=4 in the offline SYSTEM hive, the service is disabled the moment Windows boots from that image.
 - **Scheduled tasks:** Tasks are XML files in `Windows\System32\Tasks\`. Delete the file = task gone. We delete them from the mounted filesystem.
 
-### Why Some Things Must Be Done at First Logon
+### Why Some Things Must Be Done at First Boot (SetupComplete.cmd)
 
-- **Process killing:** Processes don't exist until Windows is running. We can't kill OneDrive.exe from inside a WIM.
-- **OneDrive uninstall:** OneDriveSetup.exe /uninstall must run in a live OS. We can delete the OneDrive *files* from the image, but the Appx package and scheduled tasks may persist. The first-logon script does the full uninstall.
-- **EXE/MSI installers:** They require a running OS to execute. We bake them into the image and run them at first logon.
-- **Power plan:** powercfg requires a live OS.
-- **Appx removal (online):** Windows re-provisions some packages during OOBE or first boot. Our offline removal gets most of them, but we do 3 passes at first logon to catch stragglers.
+- **Process killing:** Processes don't exist until Windows is running. We can't `taskkill /f /im OneDrive.exe` from inside a WIM. As much as we'd like to.
+- **OneDrive uninstall:** OneDriveSetup.exe /uninstall must run in a live OS. We can delete the OneDrive *files* from the image, but the Appx package and scheduled tasks may persist. SetupComplete.cmd does the full nuclear uninstall from 6 angles.
+- **EXE/MSI installers:** They require a running OS to execute. We bake them into the image, copy to Desktop via robocopy, and run them — all in cmd.
+- **Power plan:** powercfg requires a live OS. cmd handles it natively. `Disable-MMAgent` needs one PowerShell one-liner.
+- **Appx removal (online):** Windows re-provisions some packages during OOBE or first boot. Our offline removal gets most of them, but SetupComplete.cmd runs 3 passes via a PowerShell one-liner to catch stragglers. This is the one thing cmd genuinely cannot do — Microsoft tied Appx management to PowerShell cmdlets exclusively. Probably on purpose. Probably to annoy us specifically.
+
+### Why cmd Instead of PowerShell
+
+- **SetupComplete.cmd runs as LOCAL SYSTEM.** Guaranteed. No UAC. No execution policy. Microsoft's own hook.
+- **PowerShell execution policies** can prevent `.ps1` scripts from running. `cmd.exe` has no execution policy. It's been executing since 1981 and it's not about to start asking permission now.
+- **UAC blocks elevation** during the "Setting up" phase — no desktop means no UAC prompt. cmd running as SYSTEM doesn't need elevation. It's already God.
+- **Reliability:** cmd.exe is the cockroach of Windows. It runs everywhere, at any time, as any user. PowerShell is a mansion. cmd is a bunker. We chose the bunker.
+- **Three PowerShell exceptions:** `Remove-AppxPackage` (Appx removal), `Disable-MMAgent` (memory compression), `Set-MpPreference` (Defender). These have NO cmd equivalent. Everything else — `taskkill`, `sc config`, `reg add`, `robocopy`, `powercfg`, `schtasks`, `msiexec` — is native cmd.
 
 ### Zone.Identifier and Unblock-File
 
@@ -378,22 +473,26 @@ When you download a file from the internet, Windows adds an NTFS alternate data 
 
 ## 6. File Locations Reference
 
-| Location | Contents |
-|---------|----------|
-| `C:\Windows\Panther\unattend.xml` | Our autounattend (OOBE, FirstLogonCommands) |
-| `C:\Windows\Setup\Scripts\RunFirstLogon.cmd` | Batch launcher |
-| `C:\Windows\Setup\Scripts\FirstLogonScript.ps1` | Main first-logon logic |
-| `C:\Windows\Setup\Scripts\RunLocalInstallers.ps1` | App installer runner |
-| `C:\Windows\Setup\Scripts\VerifyAndCleanupBloat.ps1` | Verification sweep script |
-| `C:\Windows\Setup\Scripts\installers\` | Baked-in .exe/.msi files (deleted after install) |
-| `C:\Windows\Setup\Scripts\installer-manifest.json` | List of apps to install (deleted after install) |
-| `C:\Windows\Setup\Scripts\firstlogon-options.json` | Build options for first-logon script |
-| `C:\Windows\Setup\Scripts\packages-to-remove.txt` | Appx package prefixes to remove |
-| `C:\Windows\Setup\Scripts\wiso-firstlogon.log` | First-logon log |
-| `C:\Windows\Setup\Scripts\wiso-installer.log` | App installer log |
-| `C:\Windows\Setup\Scripts\wiso-firstlogon-done.flag` | Existence = script already ran, skip |
-| `%USERPROFILE%\Desktop\WISO-Installers\` | Copy of baked-in installers (persists for user) |
+| Location | Contents | The Vibe |
+|---------|----------|----------|
+| `C:\Windows\Panther\unattend.xml` | Our autounattend (OOBE, FirstLogonCommands) | The infiltration order |
+| `C:\Windows\Setup\Scripts\SetupComplete.cmd` | **PRIMARY EXECUTOR** — 400+ lines of cmd fury | THE RECKONING |
+| `C:\Windows\Setup\Scripts\FirstLogonScript.ps1` | Fallback stub — re-runs SetupComplete.cmd if needed | The safety net |
+| `C:\Windows\Setup\Scripts\firstlogon-options.cmd` | Build options in `set VAR=1` format for cmd | The batch bible |
+| `C:\Windows\Setup\Scripts\firstlogon-options.json` | Build options in JSON for legacy/PowerShell | The old testament |
+| `C:\Windows\Setup\Scripts\VerifyAndCleanupBloat.ps1` | Verification sweep script (scheduled tasks) | The eternal guardian |
+| `C:\Windows\Setup\Scripts\installers\` | Baked-in .exe/.msi files (deleted after install) | The contraband |
+| `C:\Windows\Setup\Scripts\installer-manifest.json` | List of apps to install (deleted after install) | The treasure map |
+| `C:\Windows\Setup\Scripts\packages-to-remove.txt` | Appx package prefixes to remove | The hit list |
+| `C:\Windows\Setup\Scripts\wiso-firstlogon.log` | First-logon log | The crime scene report |
+| `C:\Windows\Setup\Scripts\wiso-firstlogon-done.flag` | Existence = already ran, all layers check this | The "I was here" tag |
+| `C:\Windows\Setup\Scripts\wiso-defender-disabled.flag` | Defender was disabled offline — skip runtime disable | The sleeping guard sign |
+| `%USERPROFILE%\Desktop\WISO-Installers\` | Copy of baked-in installers (persists for user) | The care package |
 
 ---
 
-*This document reflects WISO v3.0.0. For older versions, some steps may differ.*
+*This document reflects WISO v3.0.0 — the cmd migration. PowerShell had its time. cmd has the throne now. For older versions, some steps may differ. For the current version, SetupComplete.cmd does everything. And it does it as LOCAL SYSTEM. With zero mercy.*
+
+*Built at 4 AM. Fueled by coffee #849. Gerald approved this document with a single, dignified nod. Steve's paws are tired but satisfied. Dave shifted his weight to the right for the first time in 6 hours. The trenchcoat creaked but held. The technical documentation is complete. The machinery is exposed. The raccoons have nothing left to hide. Except themselves. Inside the trenchcoat. Which is load-bearing. And magnificent.*
+
+*[Gerald's final review: Adequate. The section on Phase C could use more `taskkill` examples. The developer's humor has improved 3% since v2.0. Steve requests a typing break. Dave requests nothing. Dave never requests anything. Dave is the legs. Dave is perfect. I am Gerald. I am at the top. And from the top, I can see everything. Including Microsoft's telemetry. Which I have disabled. With `reg add`. From a .cmd file. Running as LOCAL SYSTEM. In a trenchcoat. At 4 AM. In a dumpster. Behind Building 92. This is my life. I regret nothing.]*
