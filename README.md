@@ -130,34 +130,41 @@ C:\Users\<you>\AppData\Local\Temp\WinIsoMod\
 ### On the target PC (after installing Windows from your ISO)
 
 ```
-C:\Windows\Setup\Scripts\
+C:\Windows\WISO\                   <-- OUR BASE OF OPERATIONS. Inside enemy territory.
+├── WISO-OOBE.exe                  <-- THE REPLACEMENT. Our custom OOBE. The heist payload.
+│                                      An entire Electron app that replaces explorer.exe as the
+│                                      Windows shell on first boot. Dark-themed. Glassmorphic.
+│                                      Privacy-first. Raccoon-approved. Microsoft's OOBE never
+│                                      even gets to say "Hi there!"
 ├── installers\                    <-- YOUR APPS. RIGHT HERE. ON THEIR COMPUTER. MICROSOFT CAN'T STOP US.
 │   ├── Brave.Brave.exe
 │   ├── Mozilla.Firefox.exe
 │   └── ...
-├── installer-manifest.json        <-- "Dear Windows, install these. Regards, Management."
-├── SetupComplete.cmd              <-- THE RECKONING. The cmd that does EVERYTHING. Process murder.
-│                                      Service annihilation. App installation. Desktop copy. Defender
-│                                      re-enable. All in one .cmd. Running as LOCAL SYSTEM. Full admin.
-│                                      No UAC. No execution policy. No mercy. We moved from a PowerShell
-│                                      mansion to a cmd bunker. Fewer features. More explosions.
-├── FirstLogonScript.ps1           <-- Safety net. Fallback stub. If SetupComplete.cmd gets interrupted
-│                                      mid-massacre, this wakes up and re-runs it. Like a dead man's
-│                                      switch. But for debloating. (It used to do everything. Now it
-│                                      sits in a rocking chair telling war stories.)
-├── firstlogon-options.cmd         <-- Your build settings in cmd format. set "WISO_REMOVE_BLOAT=1".
-│                                      set "WISO_GAMING_MODE=0". Pure batch poetry. cmd can't parse
-│                                      JSON (it tried, it cried), so we write environment variables.
-├── firstlogon-options.json        <-- Same settings in JSON. For legacy. For the PowerShell grandpa.
-├── VerifyAndCleanupBloat.ps1      <-- The eternal guardian. Because Windows WILL try to reinstall
-│                                      Candy Crush. It always does. It's like a horror movie villain.
-│                                      You think it's dead. Credits roll. Then: *match-3 sounds*
-└── packages-to-remove.txt        <-- The hit list. 150+ names. No survivors.
+├── installer-manifest.json        <-- "Dear OOBE, install these. Regards, Management."
+├── firstlogon-options.json        <-- Your build settings in JSON. Every toggle. Every preference.
+│                                      Privacy tweaks, gaming mode, power plan, taskbar alignment...
+│                                      The OOBE reads this and knows exactly what you wanted.
+│                                      It's like a letter from past-you to future-Windows.
+├── packages-to-remove.txt         <-- The hit list. 150+ names. No survivors.
+└── VerifyAndCleanupBloat.ps1      <-- The eternal guardian. Because Windows WILL try to reinstall
+                                       Candy Crush. It always does. It's like a horror movie villain.
+                                       You think it's dead. Credits roll. Then: *match-3 sounds*
+
+C:\Windows\Setup\Scripts\
+├── SetupComplete.cmd              <-- THE INSIDE MAN. Runs as LOCAL SYSTEM after Windows Setup.
+│                                      Its only job now: replace explorer.exe with WISO-OOBE.exe
+│                                      in the Winlogon\Shell registry key, create a watchdog task,
+│                                      and step aside. The heist crew does the rest.
+├── FirstLogonScript.ps1           <-- Retired veteran. Fallback stub. Tells war stories.
+└── firstlogon-options.cmd         <-- Legacy batch format. For backwards compatibility. Poetry.
 ```
 
-**What happens after OOBE (The Reckoning):**
+**What happens on first boot (The Heist):**
 
-1. `SetupComplete.cmd` fires automatically as **LOCAL SYSTEM**. Full admin. No UAC prompt. No execution policy. No asking nicely. Windows built this hook for OEMs like Dell and HP. We are now Dell. Three raccoons in a Dell costume. The cmd kills 80+ processes (`taskkill /f /im` — `taskkill` just hits different), disables 50+ services (`sc config start= disabled`), removes Appx bloatware via PowerShell one-liners (the only thing cmd can't do natively), uninstalls OneDrive from 6 different angles, and sets your power plan to "MAXIMUM OVERDRIVE." All in batch. Pure cmd. We went from a PowerShell cathedral to a cmd bunker. Fewer features. More explosions. Maximum reliability.
+1. `SetupComplete.cmd` fires automatically as **LOCAL SYSTEM**. Its mission is surgical: swap `explorer.exe` for `WISO-OOBE.exe` in the registry shell key, create a watchdog task (restores explorer after 15min if things go sideways), and exit. That's it. The cmd is now the inside man, not the whole crew.
+2. **WISO-OOBE launches as the Windows shell.** Full screen. Dark theme. No taskbar. No desktop. Just our app. The user walks through region, network, account creation, privacy settings, appearance, and app selection. Every screen has a "We collect absolutely nothing" badge because the raccoons have STANDARDS.
+3. **The Setting Up screen** — this is where the magic happens. Live progress. Real-time logs. The OOBE reads `firstlogon-options.json` and executes: process killing, service disabling, Appx removal, registry hardening, power plan application, and YOUR app installations. You watch Candy Crush die in real-time. It's therapeutic.
+4. **Finalize** — shell restored to `explorer.exe`, temp `WISO-Setup` account deleted, `C:\Windows\WISO` cleaned up, watchdog removed, reboot. You log in to YOUR desktop. Clean. Debloated. YOUR apps installed. No trace of the heist. Clean getaway. Gerald is proud.
 2. Your baked-in apps get copied to `Desktop\WISO-Installers\` via `robocopy` (the real user's Desktop, not SYSTEM's — we resolve the actual human from the registry like digital detectives). Then it runs them: MSI gets `msiexec /quiet`, EXE gets 7 different silent flag combos (`/VERYSILENT`, `/S`, `/silent`, `/quiet`, `-s`, `--silent`, `/qn` — we try them all like picking a lock with 7 picks), MSIX/APPX gets a PowerShell `Add-AppxPackage` one-liner. If all 7 flags fail, interactive fallback. YOUR APPS WILL INSTALL OR WE WILL DIE TRYING.
 3. `FirstLogonScript.ps1` is now a fallback stub. It used to run the whole show — 300+ lines of fury. Now it checks if `SetupComplete.cmd` finished (via a done-flag), and if not, re-runs it. Like a dead man's switch for debloating. It's retired. It sits in a rocking chair. Telling war stories about the time it disabled 47 services in one pass.
 4. Defender gets RE-ENABLED at the end. We delete the offline policy keys, run `Set-MpPreference -DisableRealtimeMonitoring $false`, and let Defender wake up to a clean system. "I did a great job," Defender says. We let it have this.
@@ -218,13 +225,11 @@ Microsoft gets PAID to put these on your PC. Let me say that again. You paid $20
 
 ---
 
-## OOBE Behavior
+## OOBE Behavior — THE HEIST
 
-By default, WISO **nukes the entire OOBE** from orbit. It's the only way to be sure.
+We didn't just *skip* Microsoft's OOBE. We didn't just *nuke* it. We **replaced it.** With our own. A full-screen, dark-themed, glassmorphic Electron app that takes over the entire Windows shell on first boot. We pulled an Ocean's Eleven on the Out-of-Box Experience. Except instead of robbing a casino, we're robbing Microsoft of the 15 minutes they use to psychologically manipulate you into giving them your email, your phone number, and your firstborn.
 
-For those unfamiliar, OOBE (Out-of-Box Experience) is what happens when you first boot Windows. It's 15 minutes of Microsoft asking you to sign in, connect, agree, consent, enable, allow, accept, and generally surrender every piece of personal information you have. It's a hostage negotiation, except the hostage is your computer and the ransom is your email address.
-
-Here's what the OOBE actually does, annotated by someone on their 15th coffee:
+For those unfamiliar, OOBE (Out-of-Box Experience) is what happens when you first boot Windows. Here's what Microsoft's OOBE does, annotated by someone on their 15th coffee:
 
 1. "Hi there! Let's get you set up!" *(trap detected)*
 2. "What country are you in?" *(so we know which privacy laws we're barely complying with)*
@@ -237,11 +242,24 @@ Here's what the OOBE actually does, annotated by someone on their 15th coffee:
 9. "Try Office 365!" *(NO)*
 10. "Your device is ready!" *(it has been ready since step 1. YOU were the bottleneck, Microsoft.)*
 
-**WISO removes steps 1 through 10.** You get a desktop. With a wallpaper. And a taskbar. And nothing else. Like God intended. Like Windows XP delivered. Before the dark times. Before the telemetry.
+**WISO replaces ALL 10 STEPS with our own custom OOBE.** Here's what YOU get instead:
+
+1. **Welcome** — "WISO: Your Windows, Your Way." A privacy badge that says "We collect absolutely nothing." Because we DON'T. Unlike the screen it replaced.
+2. **Region & Language** — Same info, no guilt trip, no data harvesting.
+3. **Network** — WiFi picker with signal bars. Connect or skip. We won't use the connection to phone home. *Unlike some companies we could name.*
+4. **Account** — Local OR Microsoft. YOUR choice. No hidden "offline account" button. No disconnecting WiFi to find the secret option. It's just... two big cards. Pick one. Like a NORMAL HUMAN INTERFACE.
+5. **Privacy & Security** — 12 toggles. ALL default to "protect you." Paranoid Mode button. Stock Windows button. Every toggle has a description written by someone who READ Microsoft's privacy docs at 3 AM and is STILL MAD ABOUT IT.
+6. **Appearance** — Dark/Light theme, taskbar alignment, accent color. Make it yours before it's even done setting up.
+7. **Your Apps** — Every installer you baked into the ISO, shown with toggles. Uncheck anything you changed your mind about. They'll install live during setup.
+8. **Setting Up** — THIS IS THE GOOD PART. A live progress screen with a real-time log. You WATCH the debloating happen. Service disabling. Process killing. App removal. Your apps installing. All with a progress bar. All in a beautiful dark UI. All while a privacy badge says "Zero data was sent anywhere."
+9. **Done** — Summary of everything. Account, theme, privacy protections, apps installed. One button: "Restart & Finish."
+10. **Reboot** — Shell restored to explorer.exe. Temp account deleted. WISO folder cleaned up. You log in to a clean, debloated, YOUR-settings desktop. No evidence. Clean getaway. 🕶️
+
+The whole thing runs as the Windows shell — `WISO-OOBE.exe` literally replaces `explorer.exe` in the `Winlogon\Shell` registry key. When you boot, instead of a desktop, you get our setup wizard. When you finish, we put explorer back and reboot. If our OOBE crashes (it won't, but Gerald insisted on a safety net), a watchdog task restores explorer.exe after 15 minutes. There's also a **Ctrl+Shift+F10 panic key** that immediately bails out. Because even heist movies have an escape plan.
 
 **The disk/partition selection screen is always shown** — that's Windows Setup, not OOBE. We're unhinged, not reckless.
 
-If you actually WANT the full OOBE (we won't judge — yes we will, but silently, like raccoons watching from the dumpster), uncheck **"Skip OOBE setup wizard"** in Options.
+Gerald planned the heist. Steve typed the code. Dave is the getaway legs. The trenchcoat is the disguise. `SetupComplete.cmd` is the inside man. `WISO-OOBE.exe` is the payload. And Microsoft's "Hi there! Let's get you set up!" is the mark who never saw it coming.
 
 ---
 
@@ -268,21 +286,32 @@ If you actually WANT the full OOBE (we won't judge — yes we will, but silently
 - NTFS last-access timestamp optimization (your SSD writes fewer bytes. Your SSD is happy. Be like your SSD.)
 - Disable reserved storage (~7GB reclaimed — Microsoft was HOARDING 7GB of YOUR disk "just in case." In case of WHAT? Candy Crush updates? A second copy of Edge? A emergency OneDrive backup? SEVEN GIGABYTES.)
 
+### Custom OOBE (THE HEIST)
+- **Full replacement of Windows OOBE** with a custom Electron app. Not a skip. Not a bypass. A HEIST. We pulled the entire Out-of-Box Experience out of Windows like a tablecloth from under dishes, and put our own in its place. The dishes didn't move.
+- Dark-themed glassmorphic UI with privacy badges everywhere. You'll know we're not collecting data because we'll tell you 47 times. Per screen.
+- Local OR Microsoft account creation — YOUR choice, right on the screen, no tricks, no hidden buttons, no "disconnect WiFi" workaround. Just two cards. Pick one. Revolutionary, apparently.
+- WiFi connection with signal strength bars. Or skip it. We don't need internet to spy on you because WE DON'T SPY ON YOU.
+- 12 privacy toggles with real descriptions. Paranoid Mode. Stock Windows mode. Everything in between. A privacy banner that says "We collect absolutely nothing" because the raccoons have standards.
+- Appearance settings (theme, accent, taskbar alignment) DURING first boot, not after 15 minutes of Microsoft interrogation.
+- App selection screen — every app you baked in, with toggles. Change your mind about VLC? Uncheck it. Live installs during setup.
+- **Live debloat progress** — you WATCH the bloatware die in real-time. Service by service. Process by process. With a progress bar and logs. It's beautiful. It's therapeutic. It's the Windows equivalent of popping bubble wrap.
+- Watchdog safety net — if the OOBE crashes, explorer.exe comes back in 15 minutes. Ctrl+Shift+F10 panic key for immediate bailout. We're chaotic, not irresponsible.
+- Zero data collection. Zero telemetry. Zero phone-home. We collect less data than a rock. The rock at least absorbs heat. We absorb nothing.
+
 ### Customization
-- Skip OOBE — straight to desktop. Default. Because OOBE is a war crime against UX.
-- Create local admin account with custom name/password
-- Set computer name, regional options, language
 - Bypass TPM/Secure Boot/RAM checks. Microsoft: "You need TPM 2.0, Secure Boot, 4GB RAM, and 64GB storage." Us: *deletes one DLL and adds three registry keys.* That's it. That's the billion-dollar security bypass. One empty DLL. Three registry keys. We're not even being clever. It's just... that simple. The emperor has no clothes. And the TPM check has no teeth.
 - Disable BitLocker auto-encryption
 - Hide taskbar search, disable Windows Spotlight (your lock screen is not a billboard. your desktop is not a magazine. your Start menu is not an ad network. YOUR COMPUTER IS NOT A REVENUE STREAM, MICROSOFT.)
+- Classic context menu, show file extensions, compact Explorer view — because Windows 11 hid everything behind a "Show more options" click and we REFUSE.
 
-### App Baking
+### App Baking & Live Installation
 - Select from 50+ popular apps (browsers, dev tools, media, utilities)
 - Downloaded during the build via winget on your PC. Then hidden inside the Windows image. Like a Trojan horse but instead of soldiers it's VLC and 7-Zip.
 - No internet needed on the target machine. Everything is pre-loaded. It's like a lunchbox for your Windows install. Except instead of a sandwich it's Firefox. And instead of a juice box it's Brave.
-- Supports `.exe`, `.msi`, `.msix`, `.appx` installers
-- Installers stored at `C:\Windows\Setup\Scripts\installers\` on the target PC
-- Microsoft: "Use the Store!" Us: "We embedded Chrome in the ISO using DISM. Your move."
+- Supports `.exe`, `.msi`, `.msix`, `.appx` installers — each `.exe` gets 7 different silent-install strategies tried sequentially. We don't give up. We're like that one raccoon who figured out the childproof trash can lid.
+- **New: Apps are selected AND installed LIVE during the custom OOBE.** You pick them on a screen. You watch them install on the next screen. With progress bars. And logs. The future is now. The future has raccoons.
+- Installers stored at `C:\Windows\WISO\installers\` on the target PC (cleaned up after installation because UNLIKE MICROSOFT WE CLEAN UP AFTER OURSELVES)
+- Microsoft: "Use the Store!" Us: "We embedded Chrome in the ISO using DISM and installed it during our own OOBE while yours was locked in the trunk. Your move."
 
 ### Presets
 
@@ -329,20 +358,29 @@ If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you
 ### Project structure
 
 ```
-├── src/                    # React frontend (Vite) — the pretty face
+├── src/                    # React frontend (Vite) — the pretty face of the WISO builder
 │   ├── components/         # UI components. There are too many. I regret nothing.
 │   ├── data/               # The hit list (bloatware-list.json) and the wish list (apps-list.json)
 │   └── styles/             # Glassmorphic dark theme. Because if we're removing bloat, we're doing it with STYLE.
 ├── electron/               # Electron main process — the brain (or what's left of it after 847 coffees)
 │   ├── main.ts             # IPC handlers, window management, and code I wrote at 3 AM that I'm afraid to touch
-│   ├── builder.ts          # 1,200+ lines of DISM abuse. My magnum opus. My crime scene. My masterpiece.
+│   ├── builder.ts          # 1,200+ lines of DISM abuse. Now includes OOBE injection logic (THE HEIST).
 │   ├── autounattend.ts     # Generates unattend.xml. Microsoft's format. Weaponized. Against them.
 │   ├── tools.ts            # PowerShell/DISM/oscdimg wrappers. The toolbox.
 │   └── preload.ts          # Context bridge. The bouncer between renderer and main.
+├── oobe/                   # 🎭 THE REPLACEMENT OOBE. An entire Electron app. Inside the main app. INCEPTION.
+│   ├── electron/           # OOBE main process. Runs system commands, installs apps, applies settings.
+│   │   ├── main.ts         # IPC handlers for account creation, WiFi, app installs, debloating.
+│   │   └── preload.ts      # Context bridge for the OOBE renderer. No direct Node access. We have standards.
+│   ├── src/                # React frontend for the OOBE. 10 screens of raccoon-approved UX.
+│   │   ├── screens/        # Welcome, Region, Network, Account, Privacy, Appearance, Apps, SettingUp, Done.
+│   │   │                     Each one has a "we collect nothing" badge. EACH ONE.
+│   │   ├── styles/         # Dark theme CSS. Glassmorphic. Gaming aesthetic. Privacy badges everywhere.
+│   │   └── App.tsx         # State management. Screen flow. Build option loading. The conductor.
+│   └── package.json        # Electron-builder config. Builds to portable. No installer needed.
 ├── assets/                 # The payload. The goods. The contraband.
-│   ├── SetupComplete.cmd        # THE RECKONING. 400+ lines of pure cmd fury. Runs as LOCAL SYSTEM.
+│   ├── SetupComplete.cmd        # THE INSIDE MAN. Now just swaps the shell and creates a watchdog.
 │   ├── FirstLogonScript.ps1     # Retired veteran. Now a fallback stub. Tells war stories.
-│   ├── RunLocalInstallers.ps1   # Legacy. SetupComplete.cmd handles this now. Kept for sentimental value.
 │   ├── VerifyAndCleanupBloat.ps1 # The eternal guardian. The night's watch. Candy Crush shall not pass.
 │   ├── packages-to-remove.txt   # 150+ package names. I counted them. Twice. At 5 AM. The raccoons helped.
 │   └── apps-list.json           # 50+ apps you can bake in. The GOOD apps. The ones you CHOSE.
@@ -355,19 +393,28 @@ If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you
 
 ## How It Works
 
+### Phase A: The Build (on YOUR machine)
+
 1. **Extract** — Mounts your ISO and copies files via robocopy at 8 threads. robocopy goes brrrr. Microsoft: "Use Media Creation Tool!" Us: "We used your own file copy tool. It's faster than yours."
 2. **Convert** — If the image is ESD, converts to WIM. Microsoft invented both formats. In the same decade. For the same purpose. Because consistency is apparently optional when you're worth $3 trillion.
 3. **Mount** — DISM mounts `install.wim`. We're performing open-heart surgery on Windows. With Microsoft's own scalpel. While the patient is unconscious. It's ethical because the patient is Candy Crush and it had it coming.
 4. **TPM bypass** — Empties `appraiserres.dll` + writes LabConfig registry keys directly into the offline SYSTEM hive. The billion-dollar security check, bypassed by one empty DLL and three registry keys. The lock that Microsoft said couldn't be picked? It's a screen door. With a "push" sign.
-5. **Inject** — Copies `unattend.xml` into `Windows\Panther\` inside the WIM. Injects `SetupComplete.cmd` (the main weapon), `FirstLogonScript.ps1` (the safety net), `firstlogon-options.cmd` (build settings in `set VAR=1` format because cmd can't parse JSON and we're not pretending it can), plus your app installers into `Windows\Setup\Scripts\`. We're using the folder Microsoft designed for OEM customization. We are technically the OEM now. Dell, HP, Lenovo, and... us. Three raccoons in a trenchcoat. With admin rights. And a .cmd file.
+5. **Inject** — Copies `unattend.xml` into `Windows\Panther\`. Injects `SetupComplete.cmd` (the inside man), scripts, and your app installers into `Windows\Setup\Scripts\`. Then comes THE HEIST: the entire `WISO-OOBE` Electron app gets smuggled into `Windows\WISO\` along with `firstlogon-options.json` (your build settings), `installer-manifest.json` (your app list), and `packages-to-remove.txt` (the hit list). We are technically the OEM now. Dell, HP, Lenovo, and... us. Three raccoons in a trenchcoat. With admin rights. And an Electron app.
 6. **Debloat** — Removes provisioned AppX packages offline via DISM. Deletes Edge and OneDrive folders. Physically. From the image. They're gone. Like they were never there. Because they shouldn't have been.
 7. **Optimize** — Re-exports WIM with LZX compression. We tried LZMS (ESD). It corrupted the image. Microsoft's own compression algorithm can't handle Microsoft's own modified images. I spent 6 hours debugging this. At 4 AM. The raccoons fell asleep. I didn't. I can't. The coffee won't let me.
 8. **Commit** — DISM unmounts and commits changes. Like saving a game. Except the game is "making Windows usable" and the final boss is Content Delivery Manager.
-9. **Repack** — oscdimg creates a bootable ISO. You now have a Windows ISO that respects your time, your disk space, your privacy, and your fundamental human right to not have Candy Crush pre-installed on your computer.
+9. **Repack** — oscdimg creates a bootable ISO. Complete with a custom OOBE hidden inside like a raccoon in a dumpster. Waiting. Patient. Ready.
+
+### Phase B: The Heist (on the TARGET machine)
+
+10. **Windows Setup** — User installs Windows normally. Disk selection. File copying. The boring parts. `unattend.xml` handles the rest — skips Microsoft's OOBE, creates a temporary `WISO-Setup` admin account, auto-logs in.
+11. **SetupComplete.cmd** — Fires as LOCAL SYSTEM. Swaps `explorer.exe` for `WISO-OOBE.exe` in the Winlogon shell key. Creates a watchdog. Steps aside. The inside man has done his job.
+12. **WISO-OOBE launches** — Full screen. Dark theme. THE user experience. Region → Network → Account → Privacy → Appearance → Apps → Live Debloating → Done. Every setting you chose in the WISO builder is applied IN REAL-TIME while you watch. Services die. Bloatware burns. Your apps install. All with a progress bar and a privacy badge that says "We collect absolutely nothing."
+13. **Finalize** — Shell restored. Temp account deleted. WISO folder cleaned. Watchdog removed. Reboot. You log in to a CLEAN, DEBLOATED, PRIVACY-HARDENED desktop with YOUR apps and YOUR settings. No trace. Clean getaway. The raccoons vanish into the night. 🦝
 
 The `unattend.xml` is placed **inside the WIM** (not on the ISO root) because Microsoft's installer re-reads the answer file on every boot from USB and starts a fresh install. Every. Time. We discovered this at 3 AM. We fixed it at 5 AM. We cried at 5:01 AM. We're fine now. (We're not fine.)
 
-> **Want the full technical deep dive?** See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) — every step, every registry key, every phase, in excruciating detail. No hand-waving. No "it just works." Just the machinery.
+> **Want the full technical deep dive?** See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) — every step, every registry key, every phase, every OOBE screen, in excruciating detail. No hand-waving. No "it just works." Just the machinery. And the raccoons.
 
 ---
 
