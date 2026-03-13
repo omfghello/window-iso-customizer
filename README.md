@@ -68,7 +68,7 @@ Grab them from [Releases](https://github.com/omfghello/window-iso-customizer/rel
 ## The Dev's Current Status
 
 ```
-COFFEE CONSUMED:  ████████████████████████████████████████ 847 cups
+COFFEE CONSUMED:  ████████████████████████████████████████ 853 cups
 SLEEP DEBT:       ████████████████████████████████████████ 340 hours
 SANITY:           ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 2%
 WILL TO LIVE:     ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 5%
@@ -78,7 +78,7 @@ LINES OF JOKES:   ████████████████████�
 REGRETS:          ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0
 ```
 
-I started this project because Windows 11 came pre-installed with Candy Crush and I took it personally. Three weeks, 847 cups of coffee, and approximately 0 hours of sleep later, I have created an Electron app that uses PowerShell to run DISM commands to modify WIM images to remove AppX packages that Microsoft pre-installed on an operating system I paid $200 for.
+I started this project because Windows 11 came pre-installed with Candy Crush and I took it personally. Three weeks, 853 cups of coffee, and approximately 0 hours of sleep later, I have created an Electron app that uses PowerShell to run DISM commands to modify WIM images to remove AppX packages that Microsoft pre-installed on an operating system I paid $200 for.
 
 My therapist says I have "an unhealthy fixation on Microsoft's packaging decisions." My doctor says I "need to stop drinking coffee at a rate that would concern a lab rat." My raccoons say nothing. They're raccoons. But I can tell they're proud.
 
@@ -143,8 +143,12 @@ C:\Windows\WISO\                   <-- OUR BASE OF OPERATIONS. Inside enemy terr
 ├── installer-manifest.json        <-- "Dear OOBE, install these. Regards, Management."
 ├── firstlogon-options.json        <-- Your build settings in JSON. Every toggle. Every preference.
 │                                      Privacy tweaks, gaming mode, power plan, taskbar alignment...
-│                                      The OOBE reads this and knows exactly what you wanted.
-│                                      It's like a letter from past-you to future-Windows.
+│                                      NOW INCLUDES `appsToInstall` — winget package IDs for every
+│                                      app you selected. Why? Because if the baked-in installer files
+│                                      get abducted by aliens (or Windows Update), the OOBE can
+│                                      STILL install your apps via winget at runtime. It's a dead
+│                                      man's switch for app installation. Past-you left future-Windows
+│                                      a treasure map AND a backup treasure map AND a metal detector.
 ├── packages-to-remove.txt         <-- The hit list. 150+ names. No survivors.
 └── VerifyAndCleanupBloat.ps1      <-- The eternal guardian. Because Windows WILL try to reinstall
                                        Candy Crush. It always does. It's like a horror movie villain.
@@ -163,9 +167,14 @@ C:\Windows\Setup\Scripts\
 
 1. `SetupComplete.cmd` fires automatically as **LOCAL SYSTEM**. Its mission is surgical: swap `explorer.exe` for `WISO-OOBE.exe` in the registry shell key, create a watchdog task (restores explorer after 15min if things go sideways), and exit. That's it. The cmd is now the inside man, not the whole crew.
 2. **WISO-OOBE launches as the Windows shell.** Full screen. Dark theme. No taskbar. No desktop. Just our app. The user walks through region, network, account creation, privacy settings, appearance, and app selection. Every screen has a "We collect absolutely nothing" badge because the raccoons have STANDARDS.
-3. **The Setting Up screen** — this is where the magic happens. Live progress. Real-time logs. The OOBE reads `firstlogon-options.json` and executes: process killing, service disabling, Appx removal, registry hardening, power plan application, and YOUR app installations. You watch Candy Crush die in real-time. It's therapeutic.
+3. **The Setting Up screen** — this is where the magic happens. Live progress. Real-time logs with enhanced diagnostics. The OOBE reads `firstlogon-options.json` and executes: process killing, service disabling, Appx removal, registry hardening, power plan application — ALL conditionally gated behind YOUR settings — and then the **three-layer app installation engine** kicks in (baked files → filesystem scan → winget fallback). You watch Candy Crush die in real-time. Then you watch Brave install through whichever of the three layers finds it first. It's therapeutic AND redundant. Beautifully, aggressively redundant.
 4. **Finalize** — shell restored to `explorer.exe`, temp `WISO-Setup` account deleted, `C:\Windows\WISO` cleaned up, watchdog removed, reboot. You log in to YOUR desktop. Clean. Debloated. YOUR apps installed. No trace of the heist. Clean getaway. Gerald is proud.
-2. Your baked-in apps get copied to `Desktop\WISO-Installers\` via `robocopy` (the real user's Desktop, not SYSTEM's — we resolve the actual human from the registry like digital detectives). Then it runs them: MSI gets `msiexec /quiet`, EXE gets 7 different silent flag combos (`/VERYSILENT`, `/S`, `/silent`, `/quiet`, `-s`, `--silent`, `/qn` — we try them all like picking a lock with 7 picks), MSIX/APPX gets a PowerShell `Add-AppxPackage` one-liner. If all 7 flags fail, interactive fallback. YOUR APPS WILL INSTALL OR WE WILL DIE TRYING.
+2. Your baked-in apps now have **THREE LAYERS of installation resilience** — like a Russian nesting doll of determination, except instead of dolls it's increasingly desperate attempts to install Brave:
+   - **Layer 1 — Expected Path:** Check `C:\Windows\Setup\Scripts\installers\` where we smuggled the files during the build. If they're there (they usually are, unless Windows ate them), run them. MSI gets `msiexec /quiet`, EXE gets 7 different silent flag combos (`/VERYSILENT`, `/S`, `/silent`, `/quiet`, `-s`, `--silent`, `/qn` — like picking a lock with 7 picks), MSIX/APPX gets `Add-AppxPackage`.
+   - **Layer 2 — Filesystem BFS Scan:** If Layer 1 misses, we don't give up. We don't even FLINCH. We launch a breadth-first search across every likely location on the system — `C:\Windows\WISO\`, `Desktop\WISO-Installers\`, temp folders, the build staging area — depth limit 4, scanning like a raccoon who KNOWS the trash can has food in it. Gerald designed this algorithm. Gerald is THOROUGH.
+   - **Layer 3 — Winget Fallback:** If Layers 1 AND 2 come up empty (the files were deleted, corrupted, abducted by Content Delivery Manager, or simply vibed out of existence), the OOBE reads the `appsToInstall` winget IDs from `firstlogon-options.json` and runs `winget install --id "Brave.Browser" --silent` at RUNTIME. Over the internet. Like downloading the backup parachute MID-FREEFALL. It's not elegant. It's not fast. But your apps WILL INSTALL. PERIOD. We have made it PHYSICALLY IMPOSSIBLE for your app selection to not be honored, short of an EMP or divine intervention. And Gerald is working on the EMP angle.
+   
+   Apps get copied to `Desktop\WISO-Installers\` via `robocopy` (the real user's Desktop, not SYSTEM's — we resolve the actual human from the registry like digital detectives). If all 7 silent flags fail, interactive fallback. YOUR APPS WILL INSTALL OR WE WILL DIE TRYING. Three layers deep. Belt, suspenders, AND a raccoon holding your pants up.
 3. `FirstLogonScript.ps1` is now a fallback stub. It used to run the whole show — 300+ lines of fury. Now it checks if `SetupComplete.cmd` finished (via a done-flag), and if not, re-runs it. Like a dead man's switch for debloating. It's retired. It sits in a rocking chair. Telling war stories about the time it disabled 47 services in one pass.
 4. Defender gets RE-ENABLED at the end. We delete the offline policy keys, run `Set-MpPreference -DisableRealtimeMonitoring $false`, and let Defender wake up to a clean system. "I did a great job," Defender says. We let it have this.
 5. `VerifyAndCleanupBloat.ps1` runs as scheduled tasks at 2, 5, 15, 30, 60 minutes. It's the night guard. The cleanup crew. The dude who stays after the party to make sure Candy Crush doesn't sneak back in through the window. Because it will try. IT ALWAYS TRIES.
@@ -251,7 +260,7 @@ For those unfamiliar, OOBE (Out-of-Box Experience) is what happens when you firs
 5. **Privacy & Security** — 12 toggles. ALL default to "protect you." Paranoid Mode button. Stock Windows button. Every toggle has a description written by someone who READ Microsoft's privacy docs at 3 AM and is STILL MAD ABOUT IT.
 6. **Appearance** — Dark/Light theme, taskbar alignment, accent color. Make it yours before it's even done setting up.
 7. **Your Apps** — Every installer you baked into the ISO, shown with toggles. Uncheck anything you changed your mind about. They'll install live during setup.
-8. **Setting Up** — THIS IS THE GOOD PART. A live progress screen with a real-time log. You WATCH the debloating happen. Service disabling. Process killing. App removal. Your apps installing. All with a progress bar. All in a beautiful dark UI. All while a privacy badge says "Zero data was sent anywhere."
+8. **Setting Up** — THIS IS THE GOOD PART. A live progress screen with a real-time log. You WATCH the debloating happen. Service disabling. Process killing. App removal. Then your apps install through our **THREE-LAYER RESILIENCE ENGINE** — first it checks the baked-in files, then BFS-scans the filesystem like a caffeinated bloodhound, then falls back to winget over the internet if ALL ELSE FAILS. Every path checked, every file found (or not found), every fallback triggered is logged IN REAL-TIME so you can watch the OOBE have a minor existential crisis trying to locate Brave.exe before triumphantly downloading it via winget. Enhanced diagnostics log the exact paths checked, what was found, what wasn't, and which layer ultimately delivered the goods. All with a progress bar. All in a beautiful dark UI. All while a privacy badge says "Zero data was sent anywhere." Your apps WILL install. The OOBE has THREE plans and ZERO quit.
 9. **Done** — Summary of everything. Account, theme, privacy protections, apps installed. One button: "Restart & Finish."
 10. **Reboot** — Shell restored to explorer.exe. Temp account deleted. WISO folder cleaned up. You log in to a clean, debloated, YOUR-settings desktop. No evidence. Clean getaway. 🕶️
 
@@ -295,6 +304,8 @@ Gerald planned the heist. Steve typed the code. Dave is the getaway legs. The tr
 - Appearance settings (theme, accent, taskbar alignment) DURING first boot, not after 15 minutes of Microsoft interrogation.
 - App selection screen — every app you baked in, with toggles. Change your mind about VLC? Uncheck it. Live installs during setup.
 - **Live debloat progress** — you WATCH the bloatware die in real-time. Service by service. Process by process. With a progress bar and logs. It's beautiful. It's therapeutic. It's the Windows equivalent of popping bubble wrap.
+- **Enhanced OOBE diagnostics** — the logs now show EVERYTHING. Every path checked for installers. Every file found or missing. Every fallback layer triggered. Every registry key touched. It's like a black box flight recorder, except the flight is "installing Brave" and the turbulence is "Windows moved the files again." If something goes wrong (it won't), you'll know EXACTLY what happened, where it happened, and which raccoon to blame. Gerald insisted on this level of transparency. Gerald has trust issues. Gerald is RIGHT to have trust issues.
+- **Conditional execution** — ALL destructive actions (process killing, service disabling, app removal, registry hardening) are gated behind your settings from `firstlogon-options.json`. Didn't enable "Remove Bloat"? Nothing gets removed. Didn't toggle "Privacy Hardening"? Registry stays untouched. The OOBE is a precision instrument, not a wrecking ball. Well, it's a precision wrecking ball. It only demolishes what you pointed it at. Gerald calls this "consent-driven demolition." Steve calls it "good engineering." Dave calls it nothing because Dave is the legs.
 - Watchdog safety net — if the OOBE crashes, explorer.exe comes back in 15 minutes. Ctrl+Shift+F10 panic key for immediate bailout. We're chaotic, not irresponsible.
 - Zero data collection. Zero telemetry. Zero phone-home. We collect less data than a rock. The rock at least absorbs heat. We absorb nothing.
 
@@ -304,14 +315,19 @@ Gerald planned the heist. Steve typed the code. Dave is the getaway legs. The tr
 - Hide taskbar search, disable Windows Spotlight (your lock screen is not a billboard. your desktop is not a magazine. your Start menu is not an ad network. YOUR COMPUTER IS NOT A REVENUE STREAM, MICROSOFT.)
 - Classic context menu, show file extensions, compact Explorer view — because Windows 11 hid everything behind a "Show more options" click and we REFUSE.
 
-### App Baking & Live Installation
+### App Baking & Live Installation — THE THREE-LAYER CAKE OF INEVITABILITY
 - Select from 50+ popular apps (browsers, dev tools, media, utilities)
 - Downloaded during the build via winget on your PC. Then hidden inside the Windows image. Like a Trojan horse but instead of soldiers it's VLC and 7-Zip.
-- No internet needed on the target machine. Everything is pre-loaded. It's like a lunchbox for your Windows install. Except instead of a sandwich it's Firefox. And instead of a juice box it's Brave.
-- Supports `.exe`, `.msi`, `.msix`, `.appx` installers — each `.exe` gets 7 different silent-install strategies tried sequentially. We don't give up. We're like that one raccoon who figured out the childproof trash can lid.
-- **New: Apps are selected AND installed LIVE during the custom OOBE.** You pick them on a screen. You watch them install on the next screen. With progress bars. And logs. The future is now. The future has raccoons.
+- No internet needed on the target machine **(usually)**. Everything is pre-loaded. It's like a lunchbox for your Windows install. Except instead of a sandwich it's Firefox. And instead of a juice box it's Brave. And if someone steals your lunchbox, we have a backup lunchbox. And if THAT fails, we order delivery.
+- Supports `.exe`, `.msi`, `.msix`, `.appx` installers — each `.exe` gets 7 different silent-install strategies tried sequentially. We don't give up. We're like that one raccoon who figured out the childproof trash can lid. Except now the raccoon has three different approaches to the lid.
+- **THREE-LAYER APP INSTALLATION RESILIENCE** — your apps WILL install. Period. We have THREE fallback layers. Like a Russian nesting doll of installation. Except instead of dolls it's increasingly desperate attempts to install Brave:
+  - **Layer 1 — Baked Files:** Check the expected path (`C:\Windows\Setup\Scripts\installers\`). The files we lovingly smuggled into the ISO during the build. If they're there, run them. Simple. Clean. The plan A that usually just works.
+  - **Layer 2 — Filesystem BFS Scan:** Files not where we left them? Windows moved them? Content Delivery Manager ate them? NO PROBLEM. We launch a full breadth-first search across every plausible location on the disk — `C:\Windows\WISO\`, Desktop, temp dirs, the whole neighborhood — depth limit 4. It's like Gerald sniffing out trash cans in a four-block radius. Gerald WILL find the files. Gerald has NEVER failed to find food. Or installers. Same energy.
+  - **Layer 3 — Winget Fallback at Runtime:** If Layers 1 AND 2 come back empty-handed — if the installer files were abducted, corrupted, or simply decided they didn't want to be files anymore — the OOBE reads the `appsToInstall` winget IDs from `firstlogon-options.json` and runs `winget install --id "Brave.Browser" --silent` LIVE. Over the internet. Downloading fresh at runtime. It's the nuclear option. The "break glass in case of everything going wrong" option. The "we will pull Brave from Microsoft's own package manager using Microsoft's own internet connection to install a browser that isn't Microsoft's" option. The irony is not lost on us. It's SAVORED.
+- **Enhanced diagnostics** log every path checked, every file found or missing, every layer escalation. The OOBE's install logs read like a detective novel where the detective is a raccoon and the mystery is "where did BraveBrowserSetup.exe go."
+- **New: Apps are selected AND installed LIVE during the custom OOBE.** You pick them on a screen. You watch them install on the next screen. With progress bars. And logs. And three layers of "we WILL find your app" determination. The future is now. The future has raccoons. The future has CONTINGENCY PLANS.
 - Installers stored at `C:\Windows\WISO\installers\` on the target PC (cleaned up after installation because UNLIKE MICROSOFT WE CLEAN UP AFTER OURSELVES)
-- Microsoft: "Use the Store!" Us: "We embedded Chrome in the ISO using DISM and installed it during our own OOBE while yours was locked in the trunk. Your move."
+- Microsoft: "Use the Store!" Us: "We embedded Chrome in the ISO using DISM, scanned the filesystem when it went missing, downloaded it via YOUR package manager as a fallback, and installed it during our own OOBE while yours was locked in the trunk. Your move. We have three moves. You have zero."
 
 ### Presets
 
@@ -362,7 +378,7 @@ If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you
 │   ├── components/         # UI components. There are too many. I regret nothing.
 │   ├── data/               # The hit list (bloatware-list.json) and the wish list (apps-list.json)
 │   └── styles/             # Glassmorphic dark theme. Because if we're removing bloat, we're doing it with STYLE.
-├── electron/               # Electron main process — the brain (or what's left of it after 847 coffees)
+├── electron/               # Electron main process — the brain (or what's left of it after 853 coffees)
 │   ├── main.ts             # IPC handlers, window management, and code I wrote at 3 AM that I'm afraid to touch
 │   ├── builder.ts          # 1,200+ lines of DISM abuse. Now includes OOBE injection logic (THE HEIST).
 │   ├── autounattend.ts     # Generates unattend.xml. Microsoft's format. Weaponized. Against them.
@@ -409,7 +425,7 @@ If you don't like it, write a DISM wrapper in C. We dare you. We DOUBLE dare you
 
 10. **Windows Setup** — User installs Windows normally. Disk selection. File copying. The boring parts. `unattend.xml` handles the rest — skips Microsoft's OOBE, creates a temporary `WISO-Setup` admin account, auto-logs in.
 11. **SetupComplete.cmd** — Fires as LOCAL SYSTEM. Swaps `explorer.exe` for `WISO-OOBE.exe` in the Winlogon shell key. Creates a watchdog. Steps aside. The inside man has done his job.
-12. **WISO-OOBE launches** — Full screen. Dark theme. THE user experience. Region → Network → Account → Privacy → Appearance → Apps → Live Debloating → Done. Every setting you chose in the WISO builder is applied IN REAL-TIME while you watch. Services die. Bloatware burns. Your apps install. All with a progress bar and a privacy badge that says "We collect absolutely nothing."
+12. **WISO-OOBE launches** — Full screen. Dark theme. THE user experience. Region → Network → Account → Privacy → Appearance → Apps → Live Debloating → Done. Every setting you chose in the WISO builder is applied IN REAL-TIME while you watch — conditionally, based on YOUR toggles. Services die. Bloatware burns. Your apps install through three layers of resilience (baked files → filesystem BFS scan → winget fallback). Enhanced diagnostics log every step. All with a progress bar and a privacy badge that says "We collect absolutely nothing."
 13. **Finalize** — Shell restored. Temp account deleted. WISO folder cleaned. Watchdog removed. Reboot. You log in to a CLEAN, DEBLOATED, PRIVACY-HARDENED desktop with YOUR apps and YOUR settings. No trace. Clean getaway. The raccoons vanish into the night. 🦝
 
 The `unattend.xml` is placed **inside the WIM** (not on the ISO root) because Microsoft's installer re-reads the answer file on every boot from USB and starts a fresh install. Every. Time. We discovered this at 3 AM. We fixed it at 5 AM. We cried at 5:01 AM. We're fine now. (We're not fine.)
@@ -456,7 +472,7 @@ A: We use Microsoft's own tools (DISM, oscdimg, PowerShell) to modify Microsoft'
 A: No. Updates still work. Windows might try to re-install bloatware via updates, but that's what our verify script is for. It's like a bouncer at a club. Candy Crush keeps showing up with a fake ID. We keep turning it away. Candy Crush has tried 47 different disguises. We recognize all of them. This is our life now.
 
 **Q: Why not just use Linux?**
-A: Because I want to play games and use Adobe products. Don't @ me. Also, if everyone used Linux, I'd be an unemployed raccoon. I have 847 cups of coffee to pay for. This project IS the payment.
+A: Because I want to play games and use Adobe products. Don't @ me. Also, if everyone used Linux, I'd be an unemployed raccoon. I have 853 cups of coffee to pay for. This project IS the payment.
 
 **Q: Why Electron?**
 A: Because we needed a GUI and we didn't want to learn WPF. The tool that removes bloat is 200MB. The tool that fights JavaScript is JavaScript. We are aware. We are at peace with this. In the same way that a person is at peace after their 16th coffee — technically calm, but vibrating at a frequency that concerns others.
@@ -579,23 +595,7 @@ Either way, you are legally, morally, ethically, and spiritually obligated to st
         (   )           We are powered by coffee and raccoons.
          \_/            We have removed 150+ packages.
           |             We have written 60+ jokes.
-          |             We have consumed 847 cups of coffee.
+          |             We have consumed 853 cups of coffee.
           |             We have slept 0 hours.
          / \            We are fine.
         /   \           (We are not fine.)
-       /     \          (But Windows is clean now.)
-      /_______\         (So it was worth it.)
-     |  _   _  |        (Gerald agrees.)
-     | | | | | |        (Steve is typing this.)
-     | |_| |_| |        (Dave is standing.)
-     |_________|        Star the repo.
-        WISO            The trenchcoat demands it.
-```
-
-*Built with Electron, React, Vite, 1,200+ lines of DISM commands, 60+ artisanal bloatware jokes, 5 conspiracy theories, 847 cups of coffee, 0 hours of sleep, 3 raccoons, 1 trenchcoat, and the burning, unquenchable, caffeine-fueled conviction that Candy Crush has no business being on anybody's computer, ever, for any reason, under any circumstances, in any timeline, in any universe.*
-
-*Microsoft, if you're reading this: ship a clean OS. No ads. No Candy Crush. No forced accounts. No telemetry. No Advertising.Xaml. Just Windows. Like XP. But with modern drivers. We'll delete this repo the day you do. Pinky promise. Raccoon's honor. Paw on heart.*
-
-*Until then: we are three trash pandas in a trenchcoat. With admin rights. And 847 cups of coffee. And a .cmd file that runs as LOCAL SYSTEM. And we are absolutely, categorically, irreversibly, caffeinated-ly not going away.*
-
-*Gerald is nodding. Steve just typed "taskkill /f /im CandyCrush.exe" for the 847th time today. Dave shifted his weight slightly to the left. The trenchcoat held. The code compiled. The raccoons endure. The README is now longer than the actual codebase. We are aware of this. We do not care. Gerald doesn't care. Steve is still typing. Dave is still standing. The coffee is still flowing. The Candy Crush is still being removed. This is our purpose. This is our calling. This is our dumpster. And we have ADMIN RIGHTS.*
