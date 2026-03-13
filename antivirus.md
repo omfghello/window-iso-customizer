@@ -102,21 +102,119 @@ WISO calls `Unblock-File` on all baked-in installer files to remove the NTFS Zon
 
 **Why it's flagged:** Stripping Zone.Identifier is a known technique to bypass SmartScreen and Mark-of-the-Web (MotW) protections. WISO does it because the files were already trusted by the user when they selected them for installation.
 
+### 11. Filesystem Scanning (Breadth-First Search Across Directories)
+
+The WISO OOBE now includes a `getInstallers` function that performs a breadth-first search across multiple directories to locate baked-in installer files. It uses `fs.readdirSync` to enumerate files and subdirectories across:
+
+- `C:\Windows\Setup\Scripts\` (and subdirectories)
+- `C:\Windows\Setup\`
+- `C:\` (root)
+- `C:\WISO`
+- `C:\ProgramData`
+
+The scan has a depth limit of 4 directories. It reads directory listings, checks file extensions, and logs every match it finds.
+
+**What antiviruses flag:** Rapid, recursive directory enumeration via `fs.readdirSync` across multiple system paths. Some AV engines classify this as "suspicious filesystem enumeration" or "reconnaissance behavior."
+
+**Why it's flagged:** Malware often scans the filesystem to locate sensitive files, configuration data, or other targets. A process systematically enumerating multiple directories — especially system directories like `C:\Windows\` and `C:\ProgramData` — looks like the discovery phase of an attack (MITRE ATT&CK T1083 — File and Directory Discovery). WISO is doing this to find its OWN installer files that were baked into the ISO during build. It's looking for Firefox.exe, not passwords.txt.
+
+### 12. Winget Execution at Runtime
+
+If baked-in installers can't be found on disk (Layer 1 expected path check and Layer 2 filesystem scan both fail), the OOBE falls back to executing `winget install` commands at runtime. This spawns PowerShell processes that invoke winget to download and install software packages from the internet.
+
+**What antiviruses flag:** Child processes spawning `winget.exe` or `powershell.exe` to download and execute software from external sources. The process chain looks like: `WISO-OOBE.exe` → `powershell.exe` → `winget.exe` → download → install.
+
+**Why it's flagged:** Software that spawns child processes to download and install additional executables from the internet is a textbook dropper/loader pattern. AV engines see "process downloads .exe from internet and runs it" and rightfully get nervous. The difference: WISO is installing Firefox, VLC, and 7-Zip — apps the user explicitly selected during setup — using Microsoft's own package manager (`winget`). Every winget ID comes from `firstlogon-options.json`, which was generated from the user's build choices. Nothing is installed that the user didn't choose. Winget itself verifies package integrity. But your AV doesn't know any of that. Your AV sees "unauthorized software installation" and starts sweating.
+
+---
+
+## Exact Commands Run (Full Transparency)
+
+So you know *exactly* what executes on the target machine at first logon, here are the full command lines. You can verify these against the source code.
+
+### 1. Autounattend FirstLogonCommands (what Windows Setup runs)
+
+```
+cmd /min /c "%SystemRoot%\Setup\Scripts\RunFirstLogon.cmd"
+```
+
+- `cmd` — Windows Command Processor
+- `/min` — (Note: `/min` is not a valid cmd.exe flag; it's ignored. Window hiding is done by the child process.)
+- `/c` — Execute the following command string, then exit
+- `%SystemRoot%` — Typically `C:\Windows`, so the full path is `C:\Windows\Setup\Scripts\RunFirstLogon.cmd`
+
+### 2. RunFirstLogon.cmd (what the batch file does)
+
+The batch file sets up a Run key for retries, waits for the script to exist, then invokes PowerShell:
+
+```
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File "C:\Windows\Setup\Scripts\FirstLogonScript.ps1" >> "C:\Windows\Setup\Scripts\wiso-firstlogon.log" 2>&1
+```
+
+- `-ExecutionPolicy Bypass` — Allows unsigned scripts to run
+- `-NoProfile` — Skips loading the user's PowerShell profile
+- `-WindowStyle Hidden` — No visible PowerShell window
+- `-File "..."` — Runs `FirstLogonScript.ps1` (the main first-logon logic)
+- `>> "...log" 2>&1` — Appends stdout and stderr to the log file
+
+### 3. Run key (if script not found yet, retry at next logon)
+
+```
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File "C:\Windows\Setup\Scripts\FirstLogonScript.ps1"
+```
+
+This is stored in `HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce` as `WISO_FirstLogon_Retry` only if the script file doesn't exist within 30 seconds (first boot can be slow).
+
+### 4. Child process for app installers (from FirstLogonScript.ps1)
+
+When running baked-in app installers, FirstLogonScript.ps1 spawns:
+
+```
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -NoProfile -File "C:\Windows\Setup\Scripts\RunLocalInstallers.ps1"
+```
+
+### 5. Scheduled verification sweeps (2, 5, 15, 30, 60 min after first logon)
+
+```
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File "C:\Windows\Setup\Scripts\VerifyAndCleanupBloat.ps1"
+```
+
+### 6. Winget fallback installs (if baked-in installers not found on disk)
+
+```
+winget install --id <PackageId> --silent --accept-source-agreements --accept-package-agreements
+```
+
+- `winget` — Windows Package Manager (Microsoft's own package manager)
+- `install --id <PackageId>` — Installs the specific package by its winget ID (e.g., `Mozilla.Firefox`, `VideoLAN.VLC`)
+- `--silent` — No UI, no prompts
+- `--accept-source-agreements` — Automatically accepts source repository agreements
+- `--accept-package-agreements` — Automatically accepts package license agreements
+- Only runs if the baked-in installer could not be found via expected path check or filesystem scan (Layer 3 fallback)
+- Package IDs come from the `appsToInstall` array in `firstlogon-options.json`, generated from the user's build selections
+
+All scripts are plaintext and live in `C:\Windows\Setup\Scripts\`. Logs are written to `wiso-firstlogon.log` and `wiso-installer.log` in the same folder.
+
 ---
 
 ## What to Do About It
 
 ### Option 1: Add WISO to Your Exclusions (Recommended)
-Add the WISO installation directory and your working directory to your antivirus exclusion list before building.
+Add the WISO installation directory and your working directory to your antivirus exclusion list before building. On the **target machine**, you may also need to whitelist `C:\Windows\Setup\Scripts\` — this is where the OOBE's filesystem scanner runs from and where baked-in installers live. If your AV flags the OOBE's directory enumeration (Section 11) or winget installs (Section 12), adding this path to exclusions will prevent false positives during first boot.
 
 ### Option 2: Temporarily Disable Real-Time Protection
-Disable your AV's real-time scanning during the build process, then re-enable it after. WISO does this automatically for Defender, but third-party AVs need manual intervention.
+Disable your AV's real-time scanning during the build process, then re-enable it after. WISO does this automatically for Defender, but third-party AVs need manual intervention. **Note:** On the target machine, the OOBE may trigger AV alerts when it scans the filesystem for installers (rapid `fs.readdirSync` calls across system directories) or when it spawns `winget install` processes as a fallback. The baked-in Defender policy keys (Stage 2) suppress Defender during this phase, but third-party AVs on the target machine may still react.
 
 ### Option 3: Submit a False Positive Report
 If your AV flags the built ISO or the WISO installer itself, you can submit a false positive report:
 - **Windows Defender:** https://www.microsoft.com/en-us/wdsi/filesubmission
 - **VirusTotal:** Upload the file to https://www.virustotal.com and check which engines flag it
 - **Your AV vendor:** Most have a false positive reporting page
+
+### New in this version: Behaviors that may trigger additional alerts
+The OOBE now performs two additional operations that some AV engines may flag:
+1. **Filesystem enumeration** — The `getInstallers` function uses `fs.readdirSync` to recursively scan multiple directories (up to depth 4) looking for baked-in installer files. This rapid directory enumeration across `C:\Windows\`, `C:\`, `C:\WISO`, and `C:\ProgramData` may be classified as reconnaissance/discovery behavior.
+2. **Runtime software installation via winget** — If baked-in installers aren't found on disk, the OOBE executes `winget install` commands to download and install apps from the internet. The process chain (`WISO-OOBE.exe` → `powershell.exe` → `winget.exe` → download → install) resembles a dropper/loader pattern to AV heuristics. Both behaviors are legitimate, user-initiated, and logged. If your AV flags them, the exclusion path `C:\Windows\Setup\Scripts\` and whitelisting `winget.exe` should resolve it.
 
 ---
 
