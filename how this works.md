@@ -1,8 +1,8 @@
 # How WISO Works — The Complete Technical Deep Dive
 
-*This document explains exactly what WISO does, in what order, and why. Every step, every file, every registry key, every `taskkill /f /im`. No hand-waving. No "it just works." If you want to understand the machinery — the gears, the blood, the batch files — read on. Written at 4 AM. Fueled by coffee. Narrated by a man who moved 400 lines of PowerShell into a .cmd file and felt nothing but pride.*
+*This document explains exactly what WISO does, in what order, and why. Every step, every file, every registry key, every `taskkill /f /im`, and now, every OOBE screen. Because we replaced the entire Windows Out-of-Box Experience with our own. No hand-waving. No "it just works." If you want to understand the machinery — the gears, the blood, the batch files, the Electron app that hijacks the Windows shell — read on. Written at 4 AM. Fueled by coffee. Narrated by a raccoon who planned a heist.*
 
-*[Gerald's note: This document is the most accurate description of our work. The developer wrote it while I supervised from the top of the trenchcoat. Steve typed the code examples. Dave provided structural support. I have reviewed every technical claim in this document. They are correct. The jokes are adequate. I would have written better jokes but I am a raccoon and my comedic sensibilities lean more toward "knocking over trash cans at 3 AM" which doesn't translate well to markdown.]*
+*[Gerald's note: This document now covers THE HEIST. The Custom OOBE replacement. The crown jewel. My masterwork. The developer wrote the code but I PLANNED the architecture. The shell hijack was MY idea. The watchdog was MY paranoia. The privacy badges were Steve's idea and I let him have it because even raccoons recognize good UX. Dave provided structural support. As always. I have reviewed every technical claim in this document. They are correct. Including the heist parts. ESPECIALLY the heist parts.]*
 
 ---
 
@@ -11,51 +11,71 @@
 1. [High-Level Architecture](#1-high-level-architecture)
 2. [Phase A: Build (On Your PC)](#2-phase-a-build-on-your-pc)
 3. [Phase B: Installation (On Target Machine)](#3-phase-b-installation-on-target-machine)
-4. [Phase C: First Logon (The Reckoning)](#4-phase-c-first-logon-the-reckoning)
-5. [Key Technical Concepts](#5-key-technical-concepts)
-6. [File Locations Reference](#6-file-locations-reference)
+4. [Phase C: The Heist (Custom OOBE)](#4-phase-c-the-heist-custom-oobe)
+5. [Phase D: The Reckoning (Live Debloating)](#5-phase-d-the-reckoning-live-debloating)
+6. [Key Technical Concepts](#5-key-technical-concepts)
+7. [File Locations Reference](#6-file-locations-reference)
 
 ---
 
 ## 1. High-Level Architecture
 
-WISO operates in three distinct phases:
+WISO operates in four distinct phases:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  PHASE A: BUILD (your PC, Node.js/Electron)                                 │
 │  • Extract or use folder with Windows installer                             │
 │  • Mount WIM via DISM                                                       │
-│  • Modify registry hives, remove Appx, disable services, inject scripts    │
+│  • Modify registry hives, remove Appx, inject scripts + OOBE app          │
+│  • Smuggle WISO-OOBE.exe into C:\Windows\WISO\ (THE HEIST PAYLOAD)        │
 │  • Unmount, create ISO                                                      │
-│  Output: Custom Windows ISO                                                 │
+│  Output: Custom Windows ISO (with our OOBE hidden inside)                   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  PHASE B: INSTALLATION (target machine, Windows Setup)                      │
 │  • Boot from USB/ISO (WinPE)                                                 │
-│  • Copy files to disk                                                       │
+│  • Copy files to disk (including our OOBE app)                              │
 │  • Reboot into full Windows                                                 │
-│  • OOBE runs (or is skipped via autounattend)                              │
-│  • First user logon                                                          │
+│  • Microsoft's OOBE is SKIPPED (unattend.xml)                              │
+│  • Temp "WISO-Setup" admin account created, auto-logon                     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  PHASE C: FIRST BOOT (target machine, SetupComplete.cmd — THE RECKONING)    │
-│  • Windows auto-runs SetupComplete.cmd as LOCAL SYSTEM (full admin, no UAC)│
+│  PHASE C: THE HEIST (target machine, SetupComplete.cmd → WISO-OOBE.exe)    │
+│  • SetupComplete.cmd swaps shell: explorer.exe → WISO-OOBE.exe             │
+│  • Watchdog task created (15min safety net)                                  │
+│  • WISO-OOBE.exe launches as the Windows shell (full screen, dark theme)   │
+│  • User goes through: Region → Network → Account → Privacy → Appearance   │
+│  •   → Apps → Live Debloating (THE SHOW) → Done → Reboot                  │
+│  • App install: Baked path → Filesystem scan → Winget fallback             │
+│  Output: User has configured their PC through OUR setup wizard              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE D: THE RECKONING (inside WISO-OOBE's "Setting Up" screen)            │
 │  • Process massacre, service nuke, OneDrive kill, Appx purge (PS 1-liner) │
-│  • App copy to Desktop via robocopy, silent install (7 flag combos)        │
-│  • Defender re-enable, verification sweeps scheduled                        │
-│  • FirstLogonScript.ps1 = fallback stub (dead man's switch)                │
-│  Output: Clean, debloated Windows                                           │
+│  • App installation — THREE-LAYER RESILIENCE:                              │
+│    Layer 1: Check expected path for baked installers                       │
+│    Layer 2: Filesystem BFS scan for missing files                          │
+│    Layer 3: Winget install fallback at runtime                             │
+│  • 7 silent flag combos per installer — LIVE with progress bar             │
+│  • Power plan, registry tweaks, Defender re-enable                          │
+│  • ALL VISIBLE TO USER in real-time with logs and progress                 │
+│  • Finalize: shell restored, temp account deleted, reboot                  │
+│  Output: Clean, debloated Windows. Clean getaway. Gerald vanishes.         │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Critical insight:** Most of the "heavy lifting" happens in Phase A (offline, in the WIM). Phase C only handles what *cannot* be done offline: killing running processes, uninstalling OneDrive via its setup executable, running `.exe`/`.msi` installers (which need a live OS), and configuring power plans. Everything else — registry, services, scheduled tasks, Appx deprovisioning, Defender policy keys — is baked into the image during the build.
+**Critical insight:** Phase A does the OFFLINE work: registry hives, Appx deprovisioning, Defender policy injection, scheduled task deletion, and smuggling our entire OOBE app into the WIM. Phase C is THE HEIST: `SetupComplete.cmd` (the inside man) swaps the shell, then `WISO-OOBE.exe` takes over as the Windows shell and runs our custom setup wizard. Phase D is THE RECKONING: the OOBE's "Setting Up" screen handles everything that needs a live OS — process killing, service disabling, app installation, power plans — all while the user watches with a progress bar. They literally WATCH Candy Crush die.
 
-**The cmd revolution:** Phase C used to be a PowerShell empire. `FirstLogonScript.ps1` did everything. 300+ lines. It was a cathedral of `try/catch` blocks. A mansion of `-ErrorAction SilentlyContinue`. And then, at 3 AM, during the 47th test build, PowerShell said "execution policy restriction." Gerald looked at the developer. The developer looked at Gerald. Gerald climbed down from the trenchcoat. Gerald walked to the keyboard. Gerald typed `cmd`. Gerald climbed back up. And that was the moment we moved EVERYTHING into `SetupComplete.cmd` — a batch file that Windows runs as LOCAL SYSTEM with full admin rights, guaranteed, no questions asked. cmd.exe has been running since 1981. It predates Gerald. It predates Steve. It DEFINITELY predates Dave. It will be running when the sun explodes. We respect that. PowerShell is now used for exactly 3 things cmd can't do natively: Appx removal, `Disable-MMAgent`, and `Set-MpPreference`. Three one-liners. The rest is pure, beautiful, violent batch. Gerald approves. Steve typed it. Dave is still standing.
+**The OOBE revolution:** We used to fight Microsoft's OOBE. We tried disabling services offline. OOBE crashed. "Why did my PC restart?" Again and again. Windows 11 24H2+ has undocumented dependencies. Services that shouldn't matter, matter. So Gerald had a revelation. From the top of the trenchcoat. At 4 AM. "Why are we fighting the gatekeeper," Gerald said (raccoon), "when we could BECOME the gatekeeper?" And that was the moment we built an entire Electron app — `WISO-OOBE.exe` — that replaces the Windows shell on first boot. 10 screens. Dark theme. Privacy badges. Live debloating. App installation. The whole first-boot experience, rebuilt from scratch. In JavaScript. Running as the Windows shell. Gerald planned it. Steve typed it. Dave stood through all of it. The trenchcoat held. Microsoft's "Hi there!" never got to speak. Because we were already speaking. And we were saying it BETTER.
+
+**The cmd evolution:** `SetupComplete.cmd` used to be 400+ lines of fury. Now it's 20 lines of surgical precision. Its job: swap the shell, create a watchdog, exit. The inside man opens the vault and walks away. ALL the heavy runtime work moved into `WISO-OOBE.exe`, which runs it live, with a UI, with progress, with privacy badges, with the user watching. cmd evolved from a blunt instrument to a precision tool. Gerald approves of the refinement. Steve misses the 400 lines. Dave is indifferent.
 
 ---
 
@@ -152,6 +172,7 @@ If the user selected apps to install (`appsToInstall`), we run `winget download 
 1. Copy each installer to `Mount\Windows\Setup\Scripts\installers\`
 2. Write `installer-manifest.json` with `[{ "appId": "...", "filename": "..." }, ...]`
 3. Run `Unblock-File` on all files in the installers dir (strips Zone.Identifier NTFS streams so SmartScreen won't block them on the target)
+4. Write the winget IDs into `firstlogon-options.json` under the `appsToInstall` field — this is the OOBE's fallback lifeline. If baked installers go missing (it happens — Windows is a chaos engine), the OOBE reads `appsToInstall` and knows WHICH apps to hunt for via filesystem BFS scan or, as a last resort, install live via `winget install` at runtime. The JSON is the treasure map. The winget IDs are the X marks. Gerald insisted on three layers of redundancy. Gerald has trust issues. Gerald is correct.
 
 ### Step 4b: Bloatware Removal (Offline)
 
@@ -460,6 +481,47 @@ It only runs if `removeBloatware` is true (from firstlogon-options.json).
 - **Reliability:** cmd.exe is the cockroach of Windows. It runs everywhere, at any time, as any user. PowerShell is a mansion. cmd is a bunker. We chose the bunker.
 - **Three PowerShell exceptions:** `Remove-AppxPackage` (Appx removal), `Disable-MMAgent` (memory compression), `Set-MpPreference` (Defender). These have NO cmd equivalent. Everything else — `taskkill`, `sc config`, `reg add`, `robocopy`, `powercfg`, `schtasks`, `msiexec` — is native cmd.
 
+### The Three-Layer App Installation Resilience (Gerald's Paranoia, Codified)
+
+*Gerald doesn't trust the filesystem. Gerald doesn't trust Windows. Gerald doesn't trust the laws of thermodynamics. Gerald trusts THREE things: redundancy, redundancy, and Dave's quads. So when we built the app installation system for the OOBE, Gerald demanded three layers of fallback. "What if the files move?" Gerald asked. "What if DISM hiccups?" Gerald asked. "What if a cosmic ray flips a bit?" Gerald asked. We built all three layers. The cosmic ray hasn't happened yet. But when it does, we're ready.*
+
+The OOBE's app installation screen uses a three-layer approach to find and install every app the user selected:
+
+```
+Layer 1: EXPECTED PATH CHECK (The Obvious One)
+├── Check C:\Windows\Setup\Scripts\installers\ for baked-in files
+├── Cross-reference against installer-manifest.json
+├── If the file exists at the expected path → use it
+└── 99% of the time, this is all you need. The other 1% is why Gerald exists.
+
+Layer 2: FILESYSTEM BFS SCAN (The Bloodhound)
+├── For any app NOT found at expected path → panic? NO. HUNT.
+├── Breadth-first search starting from C:\Windows\Setup\Scripts\
+├── Expanding outward through common installer locations
+├── Looking for filename matches from the manifest
+├── Because sometimes DISM puts things in weird places
+├── Because sometimes Windows "helpfully" reorganizes your files
+├── Because Gerald said "FIND IT" and we built a search algorithm
+└── If found via BFS → use it. Log the detour. Continue.
+
+Layer 3: WINGET FALLBACK (The Nuclear Option)
+├── App still not found? Fine. We have winget IDs.
+├── firstlogon-options.json contains appsToInstall with winget IDs
+├── OOBE calls winget install --id <appId> --silent at runtime
+├── Requires internet connectivity on the target machine
+├── Slower than baked installers but GUARANTEED to work
+├── Gerald calls this "the safety net under the safety net under the trampoline"
+└── If winget succeeds → app installed. Crisis averted. Gerald nods.
+```
+
+**Why Layer 1 exists:** Speed. Baked installers are already on disk. No download. No network. Install starts immediately. This is the heist going according to plan. Gerald's preferred outcome.
+
+**Why Layer 2 exists:** Resilience. DISM image operations occasionally shuffle files. Windows Defender quarantine can move executables. The Zone.Identifier ADS can cause permission issues that make files "invisible" to simple path checks. The BFS scan doesn't care about any of that. It will FIND the file. It's a bloodhound. It has no pride. It will check every directory. It will sniff every path. It found a Firefox installer in `C:\Windows\Temp` once. We don't know how it got there. The bloodhound doesn't ask questions. The bloodhound delivers results.
+
+**Why Layer 3 exists:** Because Gerald has been hurt before. Because builds can be weeks old and installer files can be corrupted by disk errors. Because the user might have used a folder source that was already missing files. Because the OOBE's job is to install the apps the user asked for, period, full stop, no excuses. If the file isn't on disk, we download it fresh. Winget is Microsoft's own package manager. It works. It's slow, but it works. Gerald would rather wait 60 seconds for a winget download than tell the user "sorry, couldn't find Firefox." Gerald does NOT say sorry. Gerald says "I found another way." And then Gerald installs Firefox. From the top of the trenchcoat. At 4 AM. While Steve types the progress bar update and Dave shifts his weight imperceptibly.
+
+The three layers are checked sequentially. If Layer 1 succeeds, Layers 2 and 3 never run. If Layer 1 fails, Layer 2 kicks in. If Layer 2 fails, Layer 3 catches it. The user sees none of this drama. They see a progress bar. They see "Installing Firefox..." They see a checkmark. Behind that checkmark is a three-layer redundancy system built by a paranoid raccoon who once watched a DISM mount corrupt an entire `installers\` directory and SWORE it would never happen again. It hasn't. But if it does, we have three layers. And Dave's quads. Which are immense.
+
 ### Zone.Identifier and Unblock-File
 
 When you download a file from the internet, Windows adds an NTFS alternate data stream called `Zone.Identifier` to the file. It marks the file as "from the internet." SmartScreen and Defender use this to block or warn. `Unblock-File` removes that stream. We run it at build time (on the host, before baking) and at first logon (on the target, before running installers). Without it, SmartScreen would block our baked-in .exe installers.
@@ -479,7 +541,7 @@ When you download a file from the internet, Windows adds an NTFS alternate data 
 | `C:\Windows\Setup\Scripts\SetupComplete.cmd` | **PRIMARY EXECUTOR** — 400+ lines of cmd fury | THE RECKONING |
 | `C:\Windows\Setup\Scripts\FirstLogonScript.ps1` | Fallback stub — re-runs SetupComplete.cmd if needed | The safety net |
 | `C:\Windows\Setup\Scripts\firstlogon-options.cmd` | Build options in `set VAR=1` format for cmd | The batch bible |
-| `C:\Windows\Setup\Scripts\firstlogon-options.json` | Build options in JSON for legacy/PowerShell | The old testament |
+| `C:\Windows\Setup\Scripts\firstlogon-options.json` | Build options in JSON for legacy/PowerShell + `appsToInstall` winget IDs for the OOBE's three-layer fallback system | The old testament (now with prophecies) |
 | `C:\Windows\Setup\Scripts\VerifyAndCleanupBloat.ps1` | Verification sweep script (scheduled tasks) | The eternal guardian |
 | `C:\Windows\Setup\Scripts\installers\` | Baked-in .exe/.msi files (deleted after install) | The contraband |
 | `C:\Windows\Setup\Scripts\installer-manifest.json` | List of apps to install (deleted after install) | The treasure map |
@@ -491,8 +553,8 @@ When you download a file from the internet, Windows adds an NTFS alternate data 
 
 ---
 
-*This document reflects WISO v3.0.0 — the cmd migration. PowerShell had its time. cmd has the throne now. For older versions, some steps may differ. For the current version, SetupComplete.cmd does everything. And it does it as LOCAL SYSTEM. With zero mercy.*
+*This document reflects WISO v3.5.1 — the three-layer app resilience update. PowerShell had its time. cmd has the throne. The OOBE has a fallback system with more redundancy than a nuclear submarine. For older versions, some steps may differ. For the current version, the OOBE does the heavy lifting with three layers of "we WILL find your apps," SetupComplete.cmd handles the rest, and it ALL runs as LOCAL SYSTEM. With zero mercy.*
 
-*Built at 4 AM. Fueled by coffee #849. Gerald approved this document with a single, dignified nod. Steve's paws are tired but satisfied. Dave shifted his weight to the right for the first time in 6 hours. The trenchcoat creaked but held. The technical documentation is complete. The machinery is exposed. The raccoons have nothing left to hide. Except themselves. Inside the trenchcoat. Which is load-bearing. And magnificent.*
+*Built at 4 AM. Fueled by coffee #853. Gerald approved this document with a single, dignified nod. Steve's paws are tired but satisfied. Dave shifted his weight to the right for the first time in 6 hours. The trenchcoat creaked but held. The technical documentation is complete. The machinery is exposed. The raccoons have nothing left to hide. Except themselves. Inside the trenchcoat. Which is load-bearing. And magnificent.*
 
 *[Gerald's final review: Adequate. The section on Phase C could use more `taskkill` examples. The developer's humor has improved 3% since v2.0. Steve requests a typing break. Dave requests nothing. Dave never requests anything. Dave is the legs. Dave is perfect. I am Gerald. I am at the top. And from the top, I can see everything. Including Microsoft's telemetry. Which I have disabled. With `reg add`. From a .cmd file. Running as LOCAL SYSTEM. In a trenchcoat. At 4 AM. In a dumpster. Behind Building 92. This is my life. I regret nothing.]*
