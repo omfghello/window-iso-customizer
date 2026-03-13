@@ -52,11 +52,58 @@ You need admin. DISM needs admin. Mounting WIM images needs admin. Modifying the
 
 ---
 
+## The Custom OOBE (The Heist)
+
+### Wait, you REPLACED the Windows OOBE?
+
+Yes. The ENTIRE thing. Microsoft's "Hi there! Let's get you set up!" — gone. Replaced with our own custom Electron app. Dark-themed. Glassmorphic. Privacy-first. 10 screens. Live debloating. App installation. Raccoon-approved. We didn't skip the OOBE. We didn't bypass it. We REPLACED it. Like swapping the engine in a car while the driver is looking at the GPS. Gerald planned the heist. Steve typed it. Dave provided structural support. The trenchcoat held.
+
+### How does the custom OOBE work?
+
+When you install Windows from a WISO ISO, here's what happens: Windows Setup finishes. `unattend.xml` skips Microsoft's OOBE entirely and creates a temporary admin account (`WISO-Setup`). `SetupComplete.cmd` fires as LOCAL SYSTEM and does ONE thing: replaces `explorer.exe` with `WISO-OOBE.exe` in the `Winlogon\Shell` registry key. When the user logs in, instead of a desktop, they see our setup wizard. Full screen. Dark theme. Privacy badges. The whole heist. When they're done, we restore `explorer.exe`, delete the temp account, clean up, and reboot. Clean getaway. No evidence. Gerald vanishes into the night.
+
+### Can I turn off the custom OOBE?
+
+No. It's always on. Because it's BETTER. Microsoft's OOBE asks for your email, your phone number, your firstborn, and your consent to 47 different telemetry streams. Ours asks you what theme you want and whether you'd like to watch Candy Crush die in real-time. The choice is obvious. Gerald made this decision unilaterally from the top of the trenchcoat and nobody objected because Gerald is RIGHT.
+
+### What if the custom OOBE crashes?
+
+Three safety nets. Because Gerald is paranoid. And his paranoia is JUSTIFIED:
+
+1. **Watchdog task** — fires 15 minutes after logon. If WISO-OOBE is still the shell, it restores `explorer.exe` and reboots. You get a normal desktop.
+2. **Ctrl+Shift+F10 panic key** — press it during ANY OOBE screen. Immediate bailout. Shell restored. Desktop appears. No questions asked.
+3. **Backup watchdog** — the OOBE app creates its own watchdog on launch, just in case the first one didn't get created.
+
+In our testing (47 builds, 12 VMs, 3 physical machines, 1 dumpster Dell Optiplex), it has never crashed. But Gerald insisted on three safety nets anyway. Gerald has trust issues. With software. With Microsoft. With the concept of stability. Gerald has been hurt before. By `execution policy restriction`. At 3 AM. We respect Gerald's boundaries.
+
+### Does the OOBE collect any data?
+
+**ABSOLUTELY NOT.** Zero. Zilch. Nada. Nothing. We don't have a server. We don't have analytics. We don't have a database. We don't have a cloud. We don't have a backend. We are an Electron app running locally on your machine. Every screen has a "We collect absolutely nothing" privacy badge because the raccoons have STANDARDS. Microsoft's OOBE has 6 privacy toggles all defaulting to ON. Ours has 12 toggles all defaulting to PROTECT YOU. We collect less data than a rock. The rock at least absorbs heat. We absorb nothing.
+
+### What screens does the custom OOBE have?
+
+1. **Welcome** — "Your Windows, Your Way." Privacy badge. Sets the tone.
+2. **Region & Language** — Standard setup. No ulterior motives.
+3. **Network** — WiFi picker with signal strength bars. Skip if you want. We don't need internet to spy because WE DON'T SPY.
+4. **Account** — Local OR Microsoft. Two big cards. YOUR choice. No hidden offline button. No disconnecting WiFi trick.
+5. **Privacy** — 12 toggles. Paranoid Mode. Stock Windows mode. Every toggle has a real description.
+6. **Appearance** — Dark/Light theme, accent color, taskbar alignment. Your PC, your look.
+7. **Apps** — Every app you baked in, with toggles. Change your mind? Uncheck it.
+8. **Setting Up** — THE SHOW. Live debloating progress. Services dying. Apps installing. With a progress bar and logs.
+9. **Done** — Summary of everything. Account, theme, privacy, apps. One button: "Restart & Finish."
+10. **Reboot** — Shell restored, temp account deleted, everything cleaned up. Clean getaway.
+
+### Will this work with future Windows versions?
+
+The shell hijack uses `Winlogon\Shell` — a registry key that has existed since Windows XP. `SetupComplete.cmd` has been a documented Windows hook since Vista. `unattend.xml` is Microsoft's own deployment format. We're using mechanisms that Microsoft has supported for 20 years. If they break these, every enterprise deployment tool in the world breaks too. So yes. It'll work. Unless Microsoft specifically targets raccoons. In which case, Gerald has a contingency plan. The contingency plan involves a second trenchcoat.
+
+---
+
 ## Customization & Options
 
 ### Can I customize what gets removed?
 
-Yes. Everything is toggleable. Want to keep Edge? Uncheck it. Want to keep the Xbox app? Use the Gaming preset. Want to keep Candy Crush? We're not judging. We're *disappointed*. But we're not judging. The GUI has checkboxes. Use them. We believe in freedom. Unlike Windows OOBE, which believes in forced Microsoft account sign-in and "suggested" apps that are actually ads.
+Yes. Everything is toggleable. Want to keep Edge? Uncheck it. Want to keep the Xbox app? Use the Gaming preset. Want to keep Candy Crush? We're not judging. We're *disappointed*. But we're not judging. The GUI has checkboxes. Use them. We believe in freedom. Unlike Windows OOBE, which — oh wait, you'll never see Windows OOBE again. Because we replaced it. With ours. Which also has checkboxes. Better checkboxes. Dark-themed checkboxes. With privacy badges.
 
 ### What if I need OneDrive?
 
@@ -92,9 +139,13 @@ Extracting a 5GB ISO. Mounting a 5GB WIM. Modifying a 5GB WIM. Unmounting a 5GB 
 
 Check the error code. `0xC1510027` = "files in use." Usually Defender. Add exclusion. Or disable. We'll re-enable. Promise. `32` = mount failed. Try again. Sometimes it's a 5-second sleep. We added that at 4 AM. No comment. Future us will weep.
 
-### Why does the first logon take so long?
+### Why does the first boot show a custom setup screen instead of Windows OOBE?
 
-`SetupComplete.cmd` is executing 400+ lines of batch fury as LOCAL SYSTEM. It's `taskkill`-ing 80+ processes. `sc config`-ing 50+ services to disabled. Running a PowerShell one-liner to remove 150+ Appx packages (3 passes). Uninstalling OneDrive from 6 angles. `robocopy`-ing your app installers to the Desktop. Running MSI/EXE/MSIX installers (7 silent flag combos per EXE). Setting up power plans via `powercfg`. It's a lot. We're not lazy. We're *thorough*. It's like a spa day for your OS. Except instead of massage it's `taskkill /f /im`. Same energy. More violence.
+THAT'S OUR OOBE. We replaced Microsoft's. You're seeing WISO's custom setup wizard — a dark-themed Electron app that handles everything: region, network, account, privacy, appearance, apps, and live debloating. It's not a bug. It's the feature. THE feature. The feature we built an entire Electron app for. The feature Gerald planned from the top of the trenchcoat. Just go through the screens. Pick your settings. Watch the debloat happen. Enjoy the privacy badges. When you click "Restart & Finish," you'll get a clean desktop with YOUR settings and YOUR apps. No Microsoft interrogation. No Cortana. No "Hi there!" Just your computer. As God intended.
+
+### Why does the "Setting Up" screen take a while?
+
+The custom OOBE's "Setting Up" screen is doing ALL the debloating live while you watch. It's `taskkill`-ing 80+ processes. `sc config`-ing 50+ services to disabled. Running PowerShell one-liners to remove 150+ Appx packages (3 passes). Uninstalling OneDrive from 6 angles. Installing YOUR selected apps with 7 silent flag combos per EXE. Setting up power plans via `powercfg`. And showing you ALL of it on a progress bar with real-time logs. It's like watching surgery. But the patient is Candy Crush. And the surgeon is a raccoon. In a trenchcoat. With admin rights. And the anesthetic is `taskkill /f /im`.
 
 ### What about the Windows ADK?
 
@@ -102,7 +153,7 @@ You need it. For oscdimg. The thing that creates bootable ISOs. It's 6GB for one
 
 ### Why is the installer so big?
 
-Electron. Chromium. Node. React. We know. The tool that removes bloat ships in a 200MB wrapper. The tool that fights JavaScript is written in JavaScript. We are a paradox. We are an ouroboros. We are a snake eating its own tail while complaining about the taste. If you can do better in C, we dare you. We tried. At 4 AM. The raccoons staged an intervention.
+Electron. Chromium. Node. React. TWICE. Because now we bundle TWO Electron apps — the main WISO builder AND the custom OOBE replacement. The tool that removes bloat ships with 350MB of JavaScript runtime. The tool that debloats Windows contains two copies of Chromium. We are a paradox inside an enigma wrapped in a trenchcoat. If you can do better in C, we dare you. We tried. At 4 AM. The raccoons staged an intervention. Gerald pointed at the OOBE's glassmorphic CSS and said "do THIS in C." We conceded the point. Gerald's paws were crossed. It was very dramatic. The trenchcoat billowed.
 
 ### Why did you move everything to a .cmd file?
 
@@ -120,7 +171,7 @@ That's it. Three one-liners. Embedded in cmd via `powershell -Command "..."`. Th
 
 ### What's SetupComplete.cmd?
 
-It's the file Windows was BORN to run. If `%WINDIR%\Setup\Scripts\SetupComplete.cmd` exists, Windows executes it as LOCAL SYSTEM after OOBE completes. Full admin. No UAC prompt. No execution policy. Microsoft built this hook for OEMs like Dell and HP to install their bloatware. The irony is not lost on us. We are now Dell. Three raccoons in a Dell costume. With a .cmd file. And 80 `taskkill` commands. And a dream. The Dell of debloating. The HP of hatred for Candy Crush.
+It's THE INSIDE MAN. If `%WINDIR%\Setup\Scripts\SetupComplete.cmd` exists, Windows executes it as LOCAL SYSTEM after OOBE completes. Full admin. No UAC prompt. No execution policy. Microsoft built this hook for OEMs like Dell and HP to install their bloatware. We're using it for the opposite. But now its job is ELEGANT: it swaps `explorer.exe` for `WISO-OOBE.exe` in the Winlogon shell key, creates a watchdog task, and exits. That's it. The inside man opens the vault door and walks away. The heist crew (WISO-OOBE) does the rest. It used to be 400+ lines of fury. Now it's 20 lines of precision. The cmd evolved. From a blunt instrument to a surgical tool. Gerald approves of the refinement. Steve misses the 400 lines. Dave is indifferent. Dave is always indifferent. Dave is the legs.
 
 ### What's firstlogon-options.cmd?
 
@@ -138,6 +189,14 @@ Layer 1: `SetupComplete.cmd` — Windows runs it as LOCAL SYSTEM. Guaranteed. Th
 
 Yes. Point us at your ISO. Or folder. We support both. We're flexible. We're also opinionated. But we're flexible about the *input*.
 
+### What's in firstlogon-options.json now?
+
+EVERYTHING. All your build toggles — `removeBloat`, `ultraPerformance`, `gamingMode`, `removeEdge`, `removeOneDrive`, the works — PLUS a brand new `appsToInstall` array containing the winget package IDs for every app you selected.
+
+It used to just be the build settings. Now it's the build settings AND your shopping list. The OOBE reads this file on first boot and knows EXACTLY what you wanted. Which apps to install. Which features to enable. Which bloat to obliterate. It's your entire build manifest in one JSON file. Gerald calls it "the heist blueprint." Steve calls it "a config file." Dave calls it nothing because Dave is the legs and the legs don't have opinions about serialization formats.
+
+The `appsToInstall` field is what powers the Layer 3 winget fallback — if the baked-in installers can't be found on disk (Layers 1 and 2), the OOBE looks at these winget IDs and says "fine, I'll download them myself." It's the contingency plan's contingency plan. Gerald is proud. Gerald has never met a contingency he didn't want to nest inside another contingency. The trenchcoat contains multitudes. And also JSON.
+
 ---
 
 ## Apps & Baking
@@ -152,7 +211,49 @@ Check your internet. Check if winget is installed. Check if the app ID is correc
 
 ### Do the baked-in apps install silently?
 
-We try. HARD. MSI gets `msiexec /quiet /norestart /qn` — pure cmd, no PowerShell needed. EXE gets the full 7-flag treatment: `/VERYSILENT` (Inno), `/S` (NSIS), `/silent`, `/quiet`, `-s`, `--silent`, `/qn`. Seven attempts. Seven chances. If all 7 fail, we go interactive and let you click through. MSIX/APPX gets a PowerShell `Add-AppxPackage` one-liner (because cmd can't do Appx and we've accepted this trauma). All of this runs in `SetupComplete.cmd` as LOCAL SYSTEM. No UAC. No SmartScreen. No Zone.Identifier warnings (we stripped those). Think of it as a bonding experience. You and Firefox. Against the world. But mostly Firefox just installs silently and you never even notice.
+We try. HARD. And now you can WATCH. The custom OOBE's "Setting Up" screen installs your apps live with a progress bar. MSI gets `msiexec /quiet /norestart /qn`. EXE gets the full 7-flag treatment: `/VERYSILENT` (Inno), `/S` (NSIS), `/silent`, `/quiet`, `-s`, `--silent`, `/qn`. Seven attempts. Seven chances. If all 7 fail, we go interactive and let you click through. MSIX/APPX gets a PowerShell `Add-AppxPackage` one-liner (because cmd can't do Appx and we've accepted this trauma). And you can PICK which apps to install during the OOBE — there's a whole screen for it. Changed your mind about VLC? Uncheck it. Want everything? Leave it all checked. It's YOUR computer. We're just the raccoons making it work. The trenchcoat provides oversight.
+
+### What if my baked-in apps aren't found during setup?
+
+Then BUCKLE UP, because your apps have **THREE entire chances** to be installed. Three. Layers. Of. Resilience. Like a raccoon trenchcoat but for software deployment:
+
+**Layer 1 — Expected Path:** We check `C:\Windows\Setup\Scripts\installers\` where the baked-in installers SHOULD be. This is the front door. The polite approach. The "excuse me, are you home?" knock.
+
+**Layer 2 — Filesystem Scan (The Bloodhound):** If Layer 1 finds nothing, we unleash a BFS (breadth-first search) scanner across your entire filesystem. It sniffs through `C:\Windows\Setup\`, `C:\`, `C:\WISO`, `C:\ProgramData`, and more. With a depth limit of 4. Because even bloodhounds need boundaries. We built a digital truffle pig. A filesystem archaeologist. Indiana Jones but for `.exe` files in weird directories.
+
+**Layer 3 — Winget Fallback:** If BOTH previous layers came up empty — if your installers somehow evaporated into the quantum foam — we fall back to `winget install` at runtime. Live. From the internet. Like ordering pizza because the fridge is empty.
+
+If your apps fail all three layers, they didn't WANT to be installed. They chose this. They chose the void. They looked at three separate rescue attempts and said "no thank you, I prefer nonexistence." We respect that. We don't understand it. But we respect it. Gerald says it's a metaphor for something. Gerald won't say what. Gerald is staring into the middle distance. The trenchcoat is concerned.
+
+### What's the filesystem scanner?
+
+We built a BLOODHOUND. A digital truffle pig. A search-and-rescue dog but for installer files that got lost during the Windows Setup shuffle.
+
+Here's the deal: sometimes Windows, in its infinite wisdom, rearranges your files during installation like a toddler "organizing" a bookshelf. The installer files you baked in might end up somewhere unexpected. So we built `getInstallers` — a breadth-first search scanner that systematically sniffs through every likely location on the filesystem:
+
+- `C:\Windows\Setup\Scripts\` (and subdirectories)
+- `C:\Windows\Setup\` (the parent, in case files got ambitious)
+- `C:\` (root level, casting a wide net)
+- `C:\WISO` (our own staging area)
+- `C:\ProgramData` (the junk drawer of Windows)
+
+It scans with a depth limit of 4 directories deep. Because we're thorough, not insane. (Debatable.) Every file it finds gets logged — exact path, exact filename, exact "oh THERE you are" energy. The diagnostics output tells you exactly what was found and where, so if something goes sideways, you know exactly where to look. Gerald designed the search pattern. Gerald has found things in dumpsters that humans couldn't find with GPS. Gerald's search algorithms are instinct-driven. The trenchcoat nods approvingly.
+
+### What if I don't have internet for the winget fallback?
+
+Then it's a good thing we have TWO layers before we even THINK about winget. The baked-in installers are physically ON YOUR DISK. They were put there during the build process. They're IN the ISO. They traveled with you. Like luggage. Like LOYAL luggage.
+
+Layer 1 checks the expected path. Layer 2 scans the filesystem with the intensity of a raccoon who smells pizza at 3 AM. Between these two, your installers WILL be found. Winget is the Layer 3 last resort — the "break glass in case of emergency" option. The nuclear option. The "everything else has somehow failed and honestly how did you even get here" option.
+
+If you're installing Windows in a bunker, a submarine, or a particularly well-shielded dumpster — no internet needed. The apps are already there. The bloodhound will find them. Gerald guarantees it. Gerald's guarantee is backed by the full faith and credit of three raccoons and one load-bearing garment. This is worth more than most warranties.
+
+### Does the OOBE only do things I selected?
+
+**YES.** Every. Single. Action. Is. Gated. Behind. Your. Settings.
+
+The custom OOBE doesn't just blindly execute a script and hope for the best. Every action — EVERY action — checks your settings first. Didn't enable "Remove Bloat"? The bloat lives. Didn't select Firefox in the app list? Firefox stays unbaked. Didn't toggle "Ultra Performance"? Your power plan remains untouched.
+
+It's like a heist crew that checks the blueprint before every single move. "Are we supposed to crack this safe?" *checks plan* "Client didn't circle it. Moving on." Gerald insisted on this architecture. Gerald has OPINIONS about conditional execution. Gerald believes that software should do what the user ASKED and nothing more. This is radical in an industry where every app installs a browser toolbar and three weather widgets. The trenchcoat operates on a strict consent-based framework. Dave is the enforcement mechanism. Dave is the legs, but Dave is also the BRAKES. Nothing moves without Dave's structural approval. And Dave checks the settings.
 
 ---
 
@@ -210,7 +311,7 @@ Three stages. Like a rocket. But instead of going to space, we're going to a cle
 
 **Stage 2 — OFFLINE (in the WIM):** NEW. We bake 7 Defender policy keys directly into the WIM's SOFTWARE registry hive. `DisableAntiSpyware=1`. `DisableRealtimeMonitoring=1`. Five more. When the target machine boots, Defender services start (OOBE needs them or it has a full-blown panic attack), but real-time scanning is already dead. It's like hiring a security guard and telling them to close their eyes. They're on the payroll. They're at their post. They're just... not looking.
 
-**Stage 3 — FIRST BOOT (SetupComplete.cmd):** The cmd does its entire reckoning — process massacre, service annihilation, app installation — with zero Defender interference. At the very end, it deletes the policy keys (`reg delete`), runs `Set-MpPreference -DisableRealtimeMonitoring $false` (PowerShell one-liner, the only way to do it), and lets Defender wake up to a sparkling clean system. Defender opens its eyes. Everything is tidy. "I did a great job protecting this system," it says, nodding approvingly. We let it have this moment. It earned nothing. But we're generous.
+**Stage 3 — FIRST BOOT (WISO-OOBE):** The custom OOBE does its entire reckoning — process massacre, service annihilation, app installation — with zero Defender interference. You watch it happen live on a progress bar. At the very end, it deletes the policy keys (`reg delete`), runs `Set-MpPreference -DisableRealtimeMonitoring $false` (PowerShell one-liner, the only way to do it), and lets Defender wake up to a sparkling clean system. Defender opens its eyes. Everything is tidy. "I did a great job protecting this system," it says, nodding approvingly. We let it have this moment. It earned nothing. But we're generous. And the user saw the whole thing on a progress bar. With a "We collect absolutely nothing" badge. Chef's kiss.
 
 ### Can I undo this?
 
@@ -236,7 +337,7 @@ Because I want to play games and use Adobe products. Don't @ me. Also, if everyo
 
 ### Why Electron?
 
-Because we needed a GUI and we didn't want to learn WPF. The tool that removes bloat is 200MB. The tool that fights JavaScript is JavaScript. We are aware. We are at peace with this. In the same way that a person is at peace after their 16th coffee — technically calm, but vibrating at a frequency that concerns others. Gerald proposed rewriting it in Rust. Gerald can't write Rust. Gerald is a raccoon. But Gerald has OPINIONS. And those opinions are LOUD. (They are silent. Gerald communicates through eyebrow movements. Gerald has very expressive eyebrows for a raccoon.)
+Because we needed a GUI and we didn't want to learn WPF. The tool that removes bloat is 200MB. The tool that fights JavaScript is JavaScript. And now we built a SECOND Electron app — the custom OOBE — that ALSO runs in JavaScript. On first boot. As the Windows shell. The irony is so thick you could spread it on toast. Two Electron apps. One trenchcoat. Three raccoons. Zero self-awareness. But you know what? The OOBE is BEAUTIFUL. Dark-themed. Glassmorphic. Privacy badges. Live debloating progress. It looks better than anything Microsoft has ever shipped in an OOBE. And it's built in Electron. The bloat-removal tool. Made of bloat. Replacing the bloat. With style. Gerald proposed rewriting it in Rust. Gerald can't write Rust. Gerald is a raccoon. But Gerald has OPINIONS. And those opinions now include CSS transition timing functions. Gerald's CSS opinions are surprisingly valid.
 
 ### Will Microsoft ban me?
 
@@ -277,10 +378,11 @@ We can disable auto-encryption in the autounattend. We don't touch existing BitL
 *If your question wasn't here, we're either: (a) still writing it, (b) it's too weird and we're scared, or (c) the raccoons ate it. Try the [GitHub issues](https://github.com/omfghello/window-iso-customizer/issues). Or just scream into the void. We'll hear you. We're always listening. We're always watching. We're always caffeinated. We now have a .cmd file that runs as LOCAL SYSTEM. We are unstoppable.*
 
 *— The WISO Team*
-*Gerald (Chief Architecture Raccoon, Top of Trenchcoat)*
-*Steve (Chief Typing Raccoon, Middle of Trenchcoat)*
-*Dave (Chief Standing Raccoon, Bottom of Trenchcoat, Legs Division)*
-*The Developer (the trenchcoat)*
-*SetupComplete.cmd (honorary team member, runs as LOCAL SYSTEM, never complains, never sleeps, perfect employee)*
+*Gerald (Chief Architecture Raccoon & Heist Planner, Top of Trenchcoat)*
+*Steve (Chief Typing Raccoon & OOBE CSS Consultant, Middle of Trenchcoat)*
+*Dave (Chief Standing Raccoon & Getaway Legs, Bottom of Trenchcoat, Legs Division)*
+*The Developer (the trenchcoat, now housing TWO Electron apps)*
+*SetupComplete.cmd (the inside man, runs as LOCAL SYSTEM, swaps the shell, steps aside)*
+*WISO-OOBE.exe (the payload, runs as the Windows shell, replaced Microsoft's entire first-boot experience, zero regrets)*
 
-*[Gerald's final note: I have reviewed this FAQ. It is adequate. The jokes could be funnier. The developer is trying his best. Steve's typing has improved 12% since v2.0. Dave continues to stand. The trenchcoat continues to hold. Candy Crush continues to be removed. All is as it should be. — Gerald, from the top of the trenchcoat, surveying his domain]*
+*[Gerald's final note: I have reviewed this FAQ. It is adequate. The Custom OOBE section is my finest work. The developer wrote the code but I PLANNED the heist. Steve typed the heist code. Dave was the legs during testing. The trenchcoat held through 47 test builds. The OOBE has never crashed. The watchdog has never fired. The panic key has never been pressed. This is because of MY architecture. MY planning. MY raccoon instincts. The developer's code is... acceptable. Steve's CSS is improving. Dave remains structurally sound. The FAQ now has 60+ questions. We are out of control. We are MAGNIFICENTLY out of control. — Gerald, from the top of the trenchcoat, having just replaced Microsoft's entire Out-of-Box Experience with a raccoon-approved alternative]*
